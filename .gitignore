@@ -1,0 +1,11 @@
+node_modules/
+.env
+cache/
+artifacts/
+typechain-types/
+agent.log
+coverage/
+coverage.json
+dashboard/node_modules/
+dashboard/.next/
+*.tgz
