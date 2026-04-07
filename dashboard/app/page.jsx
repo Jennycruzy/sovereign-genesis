@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import Header       from "../components/Header";
-import AgentHealth  from "../components/AgentHealth";
-import TreasuryFeed from "../components/TreasuryFeed";
-import DevLog       from "../components/DevLog";
+import Header        from "../components/Header";
+import AgentHealth   from "../components/AgentHealth";
+import TreasuryFeed  from "../components/TreasuryFeed";
+import DevLog        from "../components/DevLog";
+import OpenBounties  from "../components/OpenBounties";
 
 const POLL_INTERVAL = parseInt(
   process.env.NEXT_PUBLIC_POLL_INTERVAL_MS || "5000",
@@ -67,10 +68,13 @@ export default function DashboardPage() {
         {/* Row 1 — Agent health (full width) */}
         <AgentHealth data={data} />
 
-        {/* Row 2 — Feed + Dev Log side by side */}
+        {/* Row 2 — Open Bounties */}
+        <OpenBounties />
+
+        {/* Row 3 — Feed + Dev Log side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <TreasuryFeed events={data?.events || []} isLoading={loading} />
-          <DevLog events={data?.events || []} />
+          <DevLog />
         </div>
 
         {/* Row 3 — System stats strip */}

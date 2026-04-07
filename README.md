@@ -2,7 +2,24 @@
 
 **A financially sovereign, self-evolving AI agent on Tezos Etherlink (EVM)**
 
-The agent manages its own on-chain XTZ treasury, posts bounties for code contributions, reviews pull requests with AI, auto-merges approved PRs, pays contributors, and invests surplus funds — all autonomously.
+SOVEREIGN-GENESIS is an autonomous AI system that manages its own on-chain XTZ treasury, posts development bounties, reviews pull requests using AI, auto-merges approved code, pays contributors directly in XTZ, and invests surplus funds — all without human intervention.
+
+**Live Dashboard:** <!-- Add your Netlify link here after deployment -->
+
+---
+
+## What It Does
+
+The agent runs a continuous loop:
+
+1. Watches a GitHub repository for issues labelled **`Bounty`**
+2. Locks XTZ into a smart contract escrow for each bounty
+3. When a developer submits a matching PR, the AI judge reviews the code
+4. If the PR passes review: it is auto-merged and the contributor is paid in XTZ on-chain
+5. Any surplus treasury balance above a safety threshold is forwarded to a DeFi yield protocol
+6. A live dashboard displays treasury health, open bounties, and the full payment history
+
+The agent is designed to sustain itself: it won't post bounties if the treasury is too low, it reduces payouts during high volatility, and it grows its balance through yield.
 
 ---
 
@@ -11,32 +28,35 @@ The agent manages its own on-chain XTZ treasury, posts bounties for code contrib
 ```
 sovereign-genesis/
 ├── contracts/
-│   └── SovereignAgent.sol       # Treasury + bounty escrow + yield investment
+│   └── SovereignAgent.sol          # Treasury + bounty escrow + yield investment
 ├── scripts/
-│   └── deploy.js                # Hardhat deployment script
+│   └── deploy.js                   # Hardhat deployment script
 ├── agent/
-│   ├── index.js                 # Entry point / orchestrator
-│   ├── contract.js              # ethers.js contract client
-│   ├── scanner.js               # GitHub issue scanner (bounty posting)
-│   ├── judge.js                 # AI PR review (CI + LLM)
-│   ├── executor.js              # Auto-merge + bounty release
-│   ├── financial.js             # Financial awareness logic
-│   └── logger.js                # Winston logger
+│   ├── index.js                    # Entry point — starts all loops
+│   ├── contract.js                 # ethers.js wrapper for the smart contract
+│   ├── scanner.js                  # Polls GitHub for Bounty issues, calls postBounty()
+│   ├── judge.js                    # AI PR review (CI status + LLM diff analysis)
+│   ├── executor.js                 # Auto-merges PRs, reads wallet, calls releaseBounty()
+│   ├── financial.js                # Volatility detection, bounty scaling, surplus investment
+│   └── logger.js                   # Winston logger
 ├── webhook/
-│   └── server.js                # GitHub webhook listener (Express)
-├── dashboard/                   # Next.js + TailwindCSS UI
+│   └── server.js                   # GitHub webhook receiver (Express, port 3001)
+├── dashboard/                      # Next.js 14 + TailwindCSS live dashboard
 │   ├── app/
-│   │   ├── layout.jsx
-│   │   ├── page.jsx             # Main dashboard
-│   │   ├── globals.css
-│   │   └── api/contract/route.js
+│   │   ├── page.jsx                # Main dashboard page
+│   │   └── api/
+│   │       ├── contract/route.js   # Polls on-chain state + event history
+│   │       └── bounties/route.js   # GitHub issues + on-chain bounty status
 │   └── components/
-│       ├── Header.jsx
-│       ├── AgentHealth.jsx      # Treasury health panel
-│       ├── TreasuryFeed.jsx     # Real-time event stream
-│       └── DevLog.jsx           # Bounty / PR log
-├── abi/                         # Auto-generated after deploy
-│   └── SovereignAgent.json
+│       ├── Header.jsx              # Site header + last-updated indicator
+│       ├── AgentHealth.jsx         # Treasury balance, buffer, health status
+│       ├── TreasuryFeed.jsx        # Real-time on-chain event stream
+│       ├── OpenBounties.jsx        # Bounty cards with status + payout verification
+│       └── DevLog.jsx              # Full bounty history table with tx links
+├── abi/
+│   └── SovereignAgent.json         # Auto-generated after deploy (address + ABI)
+├── Dockerfile
+├── docker-compose.yml
 ├── .env.example
 ├── hardhat.config.js
 └── package.json
@@ -44,7 +64,112 @@ sovereign-genesis/
 
 ---
 
-## Quick Start
+## How It Works — Full Execution Flow
+
+```
+1.  XTZ is deposited into the contract (anyone can fund it)
+2.  Scanner polls GitHub every 60s for open issues with label "Bounty"
+3.  Financial advisor checks treasury health + volatility
+        → If balance ≤ lifeSupportBuffer: bounty is blocked
+        → If volatility > 20%: bounty amount is halved
+4.  Agent calls postBounty(prId, amount) — XTZ is locked in escrow
+5.  Developer forks the repo, completes the task, opens a Pull Request
+6.  Developer includes their payout wallet in the PR:
+        Wallet: 0xYourEtherlinkAddress
+7.  GitHub sends a webhook event to the agent (port 3001)
+8.  Judge checks GitHub CI status for the PR
+9.  Judge sends the PR diff to an LLM → verdict: PASS or FAIL
+10. Agent posts the verdict as a review comment on the PR
+11. If PASS:
+        a. Agent merges the PR via GitHub API (squash merge)
+        b. Agent reads wallet address from PR comments/description
+        c. Agent calls releaseBounty(prId, wallet) on-chain
+        d. XTZ is transferred directly to the contributor's wallet
+12. Dashboard polls every 5s and updates all panels live
+13. If surplus > investThreshold: agent calls investSurplus(yieldTarget)
+14. BountyReleased event is indexed — tx hash is surfaced in the dashboard
+        for public verification
+```
+
+---
+
+## Smart Contract — `SovereignAgent.sol`
+
+Deployed on Etherlink EVM (Solidity ^0.8.20, OpenZeppelin ReentrancyGuard).
+
+| Function | Access | Description |
+|---|---|---|
+| `postBounty(prId, amount)` | agent only | Escrow XTZ for a GitHub PR |
+| `releaseBounty(prId, contributor)` | agent only | Pay contributor and mark bounty paid |
+| `investSurplus(target)` | agent only | Forward spendable surplus to a DeFi protocol |
+| `setLifeSupportBuffer(amount)` | agent only | Update the minimum treasury reserve |
+| `setAgent(newAgent)` | agent only | Rotate the agent wallet address |
+| `spendableBalance()` | public view | Treasury balance minus life-support reserve |
+| `treasuryBalance()` | public view | Full contract balance |
+
+**Security model:** `onlyAgent` modifier on all write functions, reentrancy guard on fund transfers, checks-effects-interactions pattern throughout.
+
+---
+
+## Financial Awareness Rules
+
+The agent applies these rules automatically before every bounty decision:
+
+| Condition | Action |
+|---|---|
+| `treasury ≤ lifeSupportBuffer` | Block bounty posting entirely |
+| Balance volatility > 20% | Reduce bounty by 50% |
+| `spendableBalance > investThreshold` | Call `investSurplus()` to grow the treasury |
+
+---
+
+## Bounty Issue Format
+
+Create a GitHub Issue with label **`Bounty`**:
+
+```
+## Task
+Describe what needs to be built.
+
+## Requirements
+- Requirement 1
+- Requirement 2
+
+Bounty: 2.5 XTZ
+PR: owner/repo#42
+```
+
+## Contributor PR Format
+
+The PR description or any comment must include:
+
+```
+Wallet: 0xYourEtherlinkAddress
+```
+
+The agent reads this wallet address and sends payment directly on-chain upon merge.
+
+---
+
+## Dashboard
+
+The live dashboard shows:
+
+- **Agent Health** — treasury balance, life-support buffer, spendable balance, health status
+- **Open Bounties** — all active and completed bounties with reward amounts, contributor wallets, and a `verify tx →` link to the on-chain payment
+- **Treasury Activity** — real-time stream of all contract events (deposits, bounty posts, releases, yield investments)
+- **Development Log** — full history of every bounty with status (OPEN / FUNDED / PAID) and verifiable payment links
+
+---
+
+## Setup & Deployment
+
+### Prerequisites
+
+- Node.js 20+
+- A funded Etherlink wallet (for deployment + agent operations)
+- GitHub Personal Access Token (`repo` + `pull_requests` scopes)
+- OpenAI API key (for PR review)
 
 ### 1. Install dependencies
 
@@ -60,139 +185,73 @@ cd dashboard && npm install && cd ..
 
 ```bash
 cp .env.example .env
-# Fill in all values in .env
+# Edit .env and fill in all values
 ```
 
-Key variables:
 | Variable | Description |
 |---|---|
-| `ETHERLINK_RPC` | Etherlink Ghostnet RPC URL |
-| `DEPLOYER_PRIVATE_KEY` | Wallet key for contract deployment |
-| `AGENT_PRIVATE_KEY` | Wallet key the Node.js agent uses |
-| `GITHUB_TOKEN` | GitHub PAT (repo + pull_request scopes) |
+| `ETHERLINK_RPC` | Etherlink RPC URL |
+| `DEPLOYER_PRIVATE_KEY` | Wallet key for deploying the contract |
+| `AGENT_PRIVATE_KEY` | Wallet key the agent uses to operate the contract |
+| `GITHUB_TOKEN` | GitHub PAT |
 | `GITHUB_REPO` | `owner/repo` to watch |
-| `GITHUB_WEBHOOK_SECRET` | Shared secret for webhook HMAC |
-| `OPENAI_API_KEY` | OpenAI API key for PR review |
-| `YIELD_TARGET_ADDRESS` | Optional DeFi pool to invest surplus into |
+| `GITHUB_WEBHOOK_SECRET` | Shared secret for webhook HMAC verification |
+| `OPENAI_API_KEY` | OpenAI API key for the AI judge |
+| `YIELD_TARGET_ADDRESS` | (Optional) DeFi pool address for surplus investment |
+| `INVEST_THRESHOLD_RATIO` | (Optional) Fraction of buffer above which surplus is invested (default: 0.5) |
 
-### 3. Compile & deploy
+### 3. Compile and deploy the contract
 
 ```bash
-# Compile contracts
 npm run compile
-
-# Deploy to Etherlink Ghostnet (testnet)
-npm run deploy:testnet
-
-# Deploy to Etherlink Mainnet
-npm run deploy:mainnet
+npm run deploy:testnet   # Etherlink Ghostnet (testnet)
+npm run deploy:mainnet   # Etherlink Mainnet
 ```
 
-The deployment script writes `abi/SovereignAgent.json` with the address + ABI.
+This generates `abi/SovereignAgent.json` with the deployed address and ABI. Copy it to `dashboard/abi/` as well.
 
 ### 4. Fund the treasury
 
-Send XTZ to the deployed contract address from any wallet.  
-The contract accepts direct transfers via `receive()`.
+Send XTZ to the deployed contract address from any wallet. The contract accepts direct transfers.
 
-### 5. Start the evolution engine
+### 5. Run with Docker (recommended)
 
 ```bash
+docker compose up -d
+```
+
+This starts three containers:
+- `dashboard` — Next.js app on port 3000
+- `webhook` — GitHub webhook receiver on port 3001
+- `agent` — The autonomous agent loop
+
+### 6. Run without Docker
+
+```bash
+# Terminal 1 — agent
 npm run agent
-```
 
-### 6. Start the webhook server
-
-```bash
+# Terminal 2 — webhook
 npm run webhook
-# Listening on port 3001
+
+# Terminal 3 — dashboard
+cd dashboard && npm run dev
 ```
 
-Configure your GitHub repository webhook:
+### 7. Configure GitHub Webhook
+
+In your repository settings → Webhooks → Add webhook:
+
 - **Payload URL**: `https://your-domain.com/webhook`
 - **Content type**: `application/json`
 - **Secret**: value of `GITHUB_WEBHOOK_SECRET`
-- **Events**: `Pull requests`
-
-### 7. Start the dashboard
-
-```bash
-cd dashboard
-npm run dev   # http://localhost:3000
-```
+- **Events**: Pull requests
 
 ---
 
-## Execution Flow
+## Netlify Deployment (Dashboard Only)
 
-```
-1.  User sends XTZ to contract address
-2.  Agent treasury balance increases
-3.  Scanner polls GitHub every 60s for issues labelled "Bounty"
-4.  Scanner calls postBounty(prId, amount) on-chain
-5.  Developer submits a PR referencing the issue
-6.  Webhook fires → agent enqueues PR for review
-7.  Judge checks CI status (GitHub Checks API)
-8.  Judge sends diff to LLM → PASS or FAIL
-9.  If PASS: agent auto-merges the PR via GitHub API
-10. Agent reads contributor wallet from PR comment ("Wallet: 0x…")
-11. Agent calls releaseBounty(prId, wallet) → XTZ transferred
-12. Dashboard polls contract every 5s and updates live
-13. If surplus > threshold: agent calls investSurplus(yieldTarget)
-```
-
----
-
-## Bounty Issue Format
-
-Create a GitHub Issue with label **`Bounty`** and body:
-
-```
-## Task
-Implement feature X
-
-## Requirements
-- …
-
-Bounty: 2.5 XTZ
-PR: owner/repo#42
-```
-
-## Contributor PR Format
-
-The PR description or a comment must contain the contributor's wallet:
-
-```
-Wallet: 0xYourEtherlinkAddress
-```
-
----
-
-## Smart Contract
-
-**`SovereignAgent.sol`** — deployed on Etherlink EVM (Solidity 0.8.20)
-
-| Function | Access | Description |
-|---|---|---|
-| `postBounty(prId, amount)` | agent | Escrow XTZ for a PR |
-| `releaseBounty(prId, contributor)` | agent | Pay contributor, mark paid |
-| `investSurplus(target)` | agent | Forward surplus to DeFi protocol |
-| `setLifeSupportBuffer(amount)` | agent | Update minimum balance |
-| `setAgent(newAgent)` | agent | Rotate agent address |
-| `spendableBalance()` | public | Treasury minus buffer |
-| `treasuryBalance()` | public | Full contract balance |
-
-Security: OpenZeppelin `ReentrancyGuard`, checks-effects-interactions, `onlyAgent` modifier.
-
----
-
-## Financial Awareness Rules
-
-| Condition | Action |
-|---|---|
-| `balance ≤ lifeSupportBuffer` | Block all bounty posting |
-| Volatility > 20% | Halve bounty size |
-| `spendable > threshold` | Call `investSurplus()` |
+See the [Netlify Deployment Guide](#netlify-deployment-guide) section below for step-by-step instructions to deploy the dashboard as a static/serverless site.
 
 ---
 
@@ -201,11 +260,65 @@ Security: OpenZeppelin `ReentrancyGuard`, checks-effects-interactions, `onlyAgen
 | Network | Chain ID | RPC |
 |---|---|---|
 | Etherlink Ghostnet | 128123 | `https://node.ghostnet.etherlink.com` |
-| Etherlink Mainnet  | 42793  | `https://node.mainnet.etherlink.com` |
+| Etherlink Mainnet | 42793 | `https://node.mainnet.etherlink.com` |
+
+Block explorer: `https://shadownet.explorer.etherlink.com`
+
+---
+
+## Netlify Deployment Guide
+
+The dashboard is a Next.js 14 app and can be deployed to Netlify using the Next.js runtime adapter.
+
+### Steps
+
+**1. Push your code to GitHub** (you will do this manually — see note below)
+
+**2. Connect to Netlify**
+
+- Go to [netlify.com](https://netlify.com) → New site → Import from Git
+- Select your `sovereign-genesis` repository
+- Set the **Base directory** to `dashboard`
+- Set the **Build command** to `npm run build`
+- Set the **Publish directory** to `.next`
+
+**3. Set environment variables in Netlify**
+
+In Site settings → Environment variables, add:
+
+| Key | Value |
+|---|---|
+| `NEXT_PUBLIC_ETHERLINK_RPC` | Your Etherlink RPC URL |
+| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `5000` |
+| `GITHUB_TOKEN` | Your GitHub PAT |
+
+**4. Install the Next.js Netlify plugin**
+
+In your `dashboard/` directory:
+
+```bash
+npm install -D @netlify/plugin-nextjs
+```
+
+Create `dashboard/netlify.toml`:
+
+```toml
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+```
+
+**5. Deploy**
+
+Netlify will auto-deploy on every push to your main branch. The first deploy triggers automatically after connecting the repo.
+
+> **Note:** The agent and webhook server cannot run on Netlify (they are long-running Node.js processes). For full autonomous operation, run those on a VPS or server separately. The Netlify deployment hosts only the dashboard UI.
 
 ---
 
 ## License
 
 MIT
-
