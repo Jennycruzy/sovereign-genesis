@@ -7,6 +7,19 @@
 :root {
   --sovereign-glow: 139, 92, 246;
   --tezos-glow: 59, 130, 246;
+  --bg-primary: #050509;
+  --bg-secondary: #0f0f1a;
+  --bg-card: rgba(15, 15, 26, 0.8);
+  --text-primary: #e2e8f0;
+  --border-color: rgba(139, 92, 246, 0.3);
+}
+
+.light {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #e2e8f0;
+  --bg-card: rgba(255, 255, 255, 0.8);
+  --text-primary: #1e293b;
+  --border-color: rgba(139, 92, 246, 0.2);
 }
 
 * {
@@ -14,10 +27,17 @@
 }
 
 body {
+  background-color: var(--bg-primary);
   background-color: #050509;
-  color: #e2e8f0;
+  color: var(--text-primary);
   font-family: 'JetBrains Mono', Consolas, monospace;
   overflow-x: hidden;
+}
+
+.light body,
+body.light {
+  background-color: #f8fafc;
+  color: #1e293b;
 }
 
 /* Neon card glow */

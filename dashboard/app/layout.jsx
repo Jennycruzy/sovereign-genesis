@@ -6,9 +6,25 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const themeScript = `
+    (function() {
+      const theme = localStorage.getItem('theme') || 'dark';
+      if (theme === 'light') {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      } else {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+      }
+    })();
+  `;
+
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#050509] text-slate-100 font-mono antialiased">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-screen bg-[#050509] dark:bg-[#050509] text-slate-100 dark:text-slate-100 font-mono antialiased">
         {/* Background grid */}
         <div
           className="fixed inset-0 pointer-events-none"
