@@ -24,7 +24,7 @@ export default function DashboardPage() {
       const json = await res.json();
       setData(json);
       setError(null);
-      setLastPoll(json.timestamp || Date.now());
+      setLastPoll(Date.now());
     } catch (err) {
       setError(err.message);
     } finally {

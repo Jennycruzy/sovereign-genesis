@@ -3,23 +3,26 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev":   "next dev -p 3000",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start -p 3000"
   },
   "dependencies": {
-    "next":             "14.2.3",
-    "react":            "^18.3.1",
-    "react-dom":        "^18.3.1",
-    "ethers":           "^6.11.1",
-    "tailwindcss":      "^3.4.3",
-    "autoprefixer":     "^10.4.19",
-    "postcss":          "^8.4.38",
-    "@radix-ui/react-progress":     "^1.0.3",
-    "@radix-ui/react-separator":    "^1.0.3",
-    "class-variance-authority":     "^0.7.0",
-    "clsx":                         "^2.1.1",
-    "lucide-react":                 "^0.378.0",
-    "tailwind-merge":               "^2.3.0"
+    "@radix-ui/react-progress": "^1.0.3",
+    "@radix-ui/react-separator": "^1.0.3",
+    "autoprefixer": "^10.4.19",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "ethers": "^6.11.1",
+    "lucide-react": "^0.378.0",
+    "next": "14.2.3",
+    "postcss": "^8.4.38",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.3.0",
+    "tailwindcss": "^3.4.3"
+  },
+  "devDependencies": {
+    "@netlify/plugin-nextjs": "^5.15.9"
   }
 }

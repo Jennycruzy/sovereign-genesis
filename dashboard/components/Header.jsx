@@ -39,7 +39,7 @@ export default function Header({ lastUpdated }) {
           <div className="h-3 w-px bg-slate-700" />
           <span>Updated: <span className="text-slate-400">{time}</span></span>
           <div className="h-3 w-px bg-slate-700" />
-          <span className="text-sovereign-500">EVM · Chain 128123</span>
+          <span className="text-sovereign-500">EVM · Chain 127823</span>
         </div>
       </div>
     </header>

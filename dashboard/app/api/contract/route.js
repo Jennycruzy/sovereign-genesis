@@ -10,8 +10,13 @@ import fs   from "fs";
 import path from "path";
 
 function loadDeployment() {
-  const p = path.join(process.cwd(), "..", "abi", "SovereignAgent.json");
-  if (!fs.existsSync(p)) return null;
+  // Try local abi/ first (Docker build), then parent (dev mode)
+  const candidates = [
+    path.join(process.cwd(), "abi", "SovereignAgent.json"),
+    path.join(process.cwd(), "..", "abi", "SovereignAgent.json"),
+  ];
+  const p = candidates.find(fs.existsSync);
+  if (!p) return null;
   return JSON.parse(fs.readFileSync(p, "utf8"));
 }
 
@@ -25,7 +30,7 @@ export async function GET() {
 
   try {
     const provider  = new ethers.JsonRpcProvider(
-      process.env.NEXT_PUBLIC_ETHERLINK_RPC || "https://node.ghostnet.etherlink.com"
+      process.env.NEXT_PUBLIC_ETHERLINK_RPC || "https://node.shadownet.etherlink.com"
     );
     const contract  = new ethers.Contract(deployment.address, deployment.abi, provider);
 
@@ -35,9 +40,15 @@ export async function GET() {
       contract.spendableBalance(),
     ]);
 
-    // Fetch last 10 contract events for the activity feed
-    const filter  = { address: deployment.address, fromBlock: -5000, toBlock: "latest" };
-    const rawLogs = await provider.getLogs(filter);
+    // Fetch all events since deployment in 499-block chunks (Shadownet RPC limit)
+    const DEPLOY_BLOCK = 3661743;
+    const latest  = await provider.getBlockNumber();
+    const rawLogs = [];
+    for (let from = DEPLOY_BLOCK; from <= latest; from += 499) {
+      const to = Math.min(from + 498, latest);
+      const chunk = await provider.getLogs({ address: deployment.address, fromBlock: from, toBlock: to });
+      rawLogs.push(...chunk);
+    }
     const iface   = new ethers.Interface(deployment.abi);
 
     const events = await Promise.all(
@@ -91,7 +102,7 @@ export async function GET() {
 function formatArgs(args, eventName) {
   switch (eventName) {
     case "BountyPosted":
-      return { prId: args[0], amount: ethers.formatEther(args[1]) + " XTZ" };
+      return { prId: typeof args[0] === "object" ? (args[0].hash || String(args[0])) : String(args[0]), amount: ethers.formatEther(args[1]) + " XTZ" };
     case "BountyReleased":
       return { prId: args[0], contributor: args[1], amount: ethers.formatEther(args[2]) + " XTZ" };
     case "SurplusInvested":

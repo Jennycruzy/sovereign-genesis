@@ -1,0 +1,12 @@
+[build]
+  base = "dashboard"
+  command = "npm run build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NEXT_PUBLIC_ETHERLINK_RPC = "https://node.shadownet.etherlink.com"
+  NEXT_PUBLIC_CONTRACT_ADDRESS = "0xF53e7cD080211b4c38369f2e5f1A0b9401B5470C"
+  NEXT_PUBLIC_POLL_INTERVAL_MS = "5000"

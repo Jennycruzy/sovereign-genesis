@@ -62,7 +62,9 @@ function EventRow({ event }) {
           {Object.entries(args).map(([k, v]) => (
             <div key={k} className="flex gap-2">
               <span className="text-slate-600 shrink-0">{k}:</span>
-              <span className="truncate font-mono">{String(v)}</span>
+              <span className="truncate font-mono">
+                {typeof v === "object" && v !== null ? (v.hash || JSON.stringify(v)) : String(v)}
+              </span>
             </div>
           ))}
         </div>
