@@ -1,7 +1,7 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-const ETHERLINK_RPC       = process.env.ETHERLINK_RPC       || "https://node.ghostnet.etherlink.com";
+const ETHERLINK_RPC       = process.env.ETHERLINK_RPC       || "https://node.shadownet.etherlink.com";
 const ETHERLINK_MAINNET   = process.env.ETHERLINK_MAINNET   || "https://node.mainnet.etherlink.com";
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "0x" + "0".repeat(64);
 
@@ -18,11 +18,11 @@ module.exports = {
     // Local development
     hardhat: {},
 
-    // Etherlink Ghost-net (testnet)
+    // Etherlink Shadownet (testnet — replaced Ghostnet Jan 2026)
     etherlink_testnet: {
       url:      ETHERLINK_RPC,
       accounts: [DEPLOYER_PRIVATE_KEY],
-      chainId:  128123,
+      chainId:  127823,
     },
 
     // Etherlink Mainnet

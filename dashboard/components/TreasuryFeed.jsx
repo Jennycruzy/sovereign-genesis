@@ -71,9 +71,14 @@ function EventRow({ event }) {
 
         {/* TX link */}
         {event.txHash && (
-          <div className="mt-1 text-xs text-sovereign-600 font-mono truncate">
+          <a
+            href={`https://shadownet.explorer.etherlink.com/tx/${event.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block text-xs text-sovereign-600 hover:text-sovereign-400 font-mono truncate transition-colors"
+          >
             tx: {event.txHash}
-          </div>
+          </a>
         )}
       </div>
     </div>
