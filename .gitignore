@@ -9,3 +9,11 @@ coverage.json
 dashboard/node_modules/
 dashboard/.next/
 *.tgz
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.suo
+*.user
