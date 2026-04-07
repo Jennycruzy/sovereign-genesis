@@ -4,7 +4,7 @@
 
 SOVEREIGN-GENESIS is an autonomous AI system that manages its own on-chain XTZ treasury, posts development bounties, reviews pull requests using AI, auto-merges approved code, pays contributors directly in XTZ, and invests surplus funds — all without human intervention.
 
-**Live Dashboard:** <!-- Add your Netlify link here after deployment -->
+**Live Dashboard:** https://representative-mostly-housewares-camel.trycloudflare.com/
 
 ---
 
