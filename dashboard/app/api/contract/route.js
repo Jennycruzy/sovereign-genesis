@@ -3,16 +3,25 @@
  *
  * Returns on-chain state for the dashboard.
  * Runs server-side to avoid exposing the RPC URL to clients.
+ *
+ * Balance data is always live (3 fast RPC calls).
+ * Historical events are cached in memory and only new blocks are fetched
+ * incrementally — avoids hammering the RPC with hundreds of getLogs calls.
  */
-export const dynamic = "force-dynamic"; // never cache — always fetch live chain data
+export const dynamic = "force-dynamic"; // always run — never serve a build-time snapshot
 
 import { ethers }  from "ethers";
 import { NextResponse } from "next/server";
 import fs   from "fs";
 import path from "path";
 
+// ── Module-level event cache (persists across requests in standalone mode) ────
+const DEPLOY_BLOCK = 3661743;
+let _eventCache     = [];        // parsed event objects
+let _highWaterBlock = DEPLOY_BLOCK - 1; // highest block we've scanned
+let _blockTsCache   = {};        // blockNumber → timestamp (ms)
+
 function loadDeployment() {
-  // Try local abi/ first (Docker build), then parent (dev mode)
   const candidates = [
     path.join(process.cwd(), "abi", "SovereignAgent.json"),
     path.join(process.cwd(), "..", "abi", "SovereignAgent.json"),
@@ -24,61 +33,62 @@ function loadDeployment() {
 
 export async function GET() {
   const deployment = loadDeployment();
-
-  // If no deployment yet, return demo data so the UI renders
-  if (!deployment) {
-    return NextResponse.json(demoData());
-  }
+  if (!deployment) return NextResponse.json(demoData());
 
   try {
-    const provider  = new ethers.JsonRpcProvider(
+    const provider = new ethers.JsonRpcProvider(
       process.env.NEXT_PUBLIC_ETHERLINK_RPC || "https://node.shadownet.etherlink.com"
     );
-    const contract  = new ethers.Contract(deployment.address, deployment.abi, provider);
+    const contract = new ethers.Contract(deployment.address, deployment.abi, provider);
 
+    // ── 1. Live balance (always fresh, 3 parallel calls) ─────────────────────
     const [treasuryWei, bufferWei, spendableWei] = await Promise.all([
       provider.getBalance(deployment.address),
       contract.lifeSupportBuffer(),
       contract.spendableBalance(),
     ]);
 
-    // Fetch all events since deployment in 499-block chunks (Shadownet RPC limit)
-    const DEPLOY_BLOCK = 3661743;
-    const latest  = await provider.getBlockNumber();
-    const rawLogs = [];
-    for (let from = DEPLOY_BLOCK; from <= latest; from += 499) {
-      const to = Math.min(from + 498, latest);
-      const chunk = await provider.getLogs({ address: deployment.address, fromBlock: from, toBlock: to });
-      rawLogs.push(...chunk);
-    }
-    const iface   = new ethers.Interface(deployment.abi);
+    // ── 2. Incremental event fetch ───────────────────────────────────────────
+    const latest = await provider.getBlockNumber();
+    const iface  = new ethers.Interface(deployment.abi);
 
-    const events = await Promise.all(
-      rawLogs.map(async (log) => {
+    if (latest > _highWaterBlock) {
+      const fromBlock = _highWaterBlock + 1;
+      const rawLogs   = [];
+      for (let from = fromBlock; from <= latest; from += 499) {
+        const to = Math.min(from + 498, latest);
+        const chunk = await provider.getLogs({
+          address: deployment.address, fromBlock: from, toBlock: to,
+        });
+        rawLogs.push(...chunk);
+      }
+
+      // Parse new logs and fetch their block timestamps
+      for (const log of rawLogs) {
         try {
           const parsed = iface.parseLog(log);
-          // Fetch block timestamp for the DevLog
-          let timestamp = null;
-          try {
-            const block = await provider.getBlock(log.blockNumber);
-            timestamp = block ? block.timestamp * 1000 : null; // ms
-          } catch { /* fallback: no timestamp */ }
-          return {
+          // Batch-friendly: only fetch timestamp if not cached
+          if (!_blockTsCache[log.blockNumber]) {
+            try {
+              const block = await provider.getBlock(log.blockNumber);
+              _blockTsCache[log.blockNumber] = block ? block.timestamp * 1000 : null;
+            } catch { /* fallback: no timestamp */ }
+          }
+          _eventCache.push({
             name:        parsed.name,
             args:        formatArgs(parsed.args, parsed.name),
             blockNumber: log.blockNumber,
             txHash:      log.transactionHash,
-            timestamp,
-          };
-        } catch {
-          return null;
-        }
-      })
-    );
-    const filteredEvents = events
-      .filter(Boolean)
-      .slice(-20)
-      .reverse();
+            timestamp:   _blockTsCache[log.blockNumber] || null,
+          });
+        } catch { /* skip unparsable logs */ }
+      }
+
+      _highWaterBlock = latest;
+    }
+
+    // Return the last 20 events, newest first
+    const events = _eventCache.slice(-20).reverse();
 
     return NextResponse.json({
       address:    deployment.address,
@@ -87,13 +97,14 @@ export async function GET() {
       buffer:     ethers.formatEther(bufferWei),
       spendable:  ethers.formatEther(spendableWei),
       health:     treasuryWei <= bufferWei ? "CRITICAL" : "HEALTHY",
-      events: filteredEvents,
+      events,
       timestamp:  Date.now(),
     });
   } catch (err) {
     console.error("Contract API error:", err.message);
+    // Graceful degradation: return cached events with error flag
     return NextResponse.json(
-      { error: err.message },
+      { error: err.message, events: _eventCache.slice(-20).reverse(), timestamp: Date.now() },
       { status: 500 }
     );
   }

@@ -21,6 +21,8 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       - NEXT_PUBLIC_ETHERLINK_RPC=https://node.shadownet.etherlink.com
       - NEXT_PUBLIC_CONTRACT_ADDRESS=0xF53e7cD080211b4c38369f2e5f1A0b9401B5470C

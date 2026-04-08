@@ -12,6 +12,11 @@ const GITHUB_REPO = "Jennycruzy/sovereign-genesis";
 const BOUNTY_RE = /bounty[:\s]+([0-9]+(?:\.[0-9]+)?)\s*xtz/i;
 const PR_RE = /pr[:\s]+(?:([a-z0-9_.-]+\/[a-z0-9_.-]+))?#(\d+)/i;
 
+// ── Module-level release-event cache (incremental) ───────────────────────────
+const DEPLOY_BLOCK = 3661743;
+let _releaseCache     = {};      // keccak256(prId) → { txHash, blockNumber }
+let _releaseHighBlock = DEPLOY_BLOCK - 1;
+
 function loadDeployment() {
   const candidates = [
     path.join(process.cwd(), "abi", "SovereignAgent.json"),
@@ -56,25 +61,29 @@ export async function GET() {
       );
       contract = new ethers.Contract(deployment.address, deployment.abi, provider);
 
-      // Batch-fetch all BountyReleased events once so we can attach txHash to paid bounties
+      // Incremental fetch of BountyReleased events (cached across requests)
       try {
-        const DEPLOY_BLOCK = 3661743;
         const latest = await provider.getBlockNumber();
-        const releaseSig = ethers.id("BountyReleased(string,address,uint256)");
-        for (let from = DEPLOY_BLOCK; from <= latest; from += 499) {
-          const to = Math.min(from + 498, latest);
-          const chunk = await provider.getLogs({
-            address: deployment.address,
-            topics: [releaseSig],
-            fromBlock: from,
-            toBlock: to,
-          });
-          for (const log of chunk) {
-            const topic1 = log.topics[1]; // keccak256(githubPrId)
-            releaseMap[topic1] = { txHash: log.transactionHash, blockNumber: log.blockNumber };
+        if (latest > _releaseHighBlock) {
+          const releaseSig = ethers.id("BountyReleased(string,address,uint256)");
+          const fromBlock = _releaseHighBlock + 1;
+          for (let from = fromBlock; from <= latest; from += 499) {
+            const to = Math.min(from + 498, latest);
+            const chunk = await provider.getLogs({
+              address: deployment.address,
+              topics: [releaseSig],
+              fromBlock: from,
+              toBlock: to,
+            });
+            for (const log of chunk) {
+              const topic1 = log.topics[1]; // keccak256(githubPrId)
+              _releaseCache[topic1] = { txHash: log.transactionHash, blockNumber: log.blockNumber };
+            }
           }
+          _releaseHighBlock = latest;
         }
       } catch { /* non-fatal — tx links just won't appear */ }
+      releaseMap = _releaseCache;
     }
 
     // GitHub auth headers reused for comment fetching below
