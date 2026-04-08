@@ -4,6 +4,8 @@
  * Returns on-chain state for the dashboard.
  * Runs server-side to avoid exposing the RPC URL to clients.
  */
+export const dynamic = "force-dynamic"; // never cache — always fetch live chain data
+
 import { ethers }  from "ethers";
 import { NextResponse } from "next/server";
 import fs   from "fs";

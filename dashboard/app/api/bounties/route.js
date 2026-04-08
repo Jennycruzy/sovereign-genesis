@@ -1,6 +1,8 @@
 /**
  * /api/bounties — fetches open bounty issues from GitHub + on-chain status
  */
+export const dynamic = "force-dynamic"; // never cache — always fetch live data
+
 import { ethers } from "ethers";
 import { NextResponse } from "next/server";
 import fs from "fs";
