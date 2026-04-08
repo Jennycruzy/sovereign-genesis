@@ -51,7 +51,59 @@ function buildPrId(prNumber) {
 }
 
 /**
+ * Post a comment asking the contributor to add their wallet address.
+ * Used as a blocking step before merge.
+ */
+async function postWalletRequestComment(prNumber) {
+  const body =
+    `### SOVEREIGN Payment Setup Required\n\n` +
+    `❌ **No wallet address found — cannot process bounty payment**\n\n` +
+    `To receive your XTZ bounty, add your Etherlink wallet address to this PR description ` +
+    `or as a comment in exactly this format:\n\n` +
+    `\`\`\`\nWallet: 0xYourEtherlinkAddress\n\`\`\`\n\n` +
+    `Once added, push a new commit or re-request review — ` +
+    `the agent will pick it up automatically and process payment.\n\n` +
+    `<!-- SOVEREIGN:WALLET_MISSING prNumber=${prNumber} -->`;
+  try {
+    await octokit.issues.createComment({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      issue_number: prNumber,
+      body,
+    });
+  } catch (err) {
+    logger.warn(`Executor: could not post wallet request comment — ${err.message}`);
+  }
+}
+
+/**
+ * Post a comment on a PR that was merged externally with no wallet found.
+ * The contributor can still reply with their wallet to trigger late payment.
+ */
+async function postMergedNoWalletComment(prNumber) {
+  const body =
+    `### SOVEREIGN No Payout\n\n` +
+    `⚠️ **This PR was merged but no wallet address was found — bounty has NOT been released**\n\n` +
+    `If you are the contributor, add your Etherlink wallet address as a comment:\n\n` +
+    `\`\`\`\nWallet: 0xYourEtherlinkAddress\n\`\`\`\n\n` +
+    `The agent monitors this PR and will attempt to release the bounty once a wallet is provided.\n\n` +
+    `<!-- SOVEREIGN:MERGED_NO_WALLET prNumber=${prNumber} -->`;
+  try {
+    await octokit.issues.createComment({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      issue_number: prNumber,
+      body,
+    });
+  } catch (err) {
+    logger.warn(`Executor: could not post no-wallet comment — ${err.message}`);
+  }
+}
+
+/**
  * Merge a PR and release its bounty.
+ * Checks for wallet address BEFORE merging — if missing, blocks merge and
+ * asks the contributor to provide one.
  *
  * @param {number} prNumber
  * @returns {{ merged: boolean, txHash: string | null, error: string | null }}
@@ -59,6 +111,19 @@ function buildPrId(prNumber) {
 async function executeApprovedPr(prNumber) {
   const prId = buildPrId(prNumber);
   logger.info(`Executor: processing approved PR #${prNumber} (${prId})`);
+
+  // ── 0. Pre-flight: wallet check BEFORE merging ────────────────────────────
+  // We refuse to merge without a wallet so the PR stays open for the contributor
+  // to add their address — no merge means no irreversible state change.
+  const wallet = await resolveContributorWallet(prNumber);
+  if (!wallet) {
+    logger.warn(
+      `Executor: PR #${prNumber} has no wallet address — blocking merge, ` +
+      `posting instructions for contributor`
+    );
+    await postWalletRequestComment(prNumber);
+    return { merged: false, txHash: null, error: "No wallet address — merge blocked, contributor notified" };
+  }
 
   // ── 1. Merge the PR ───────────────────────────────────────────────────────
   try {
@@ -81,17 +146,7 @@ async function executeApprovedPr(prNumber) {
     return { merged: false, txHash: null, error: err.message };
   }
 
-  // ── 2. Resolve contributor wallet ─────────────────────────────────────────
-  const wallet = await resolveContributorWallet(prNumber);
-  if (!wallet) {
-    logger.warn(
-      `Executor: PR #${prNumber} merged but no wallet address found. ` +
-      "Bounty NOT released. Contributor must claim manually."
-    );
-    return { merged: true, txHash: null, error: "No contributor wallet found" };
-  }
-
-  // ── 3. Release bounty on-chain ────────────────────────────────────────────
+  // ── 2. Release bounty on-chain ────────────────────────────────────────────
   const alreadyPaid = await contract.isBountyPaid(prId);
   if (alreadyPaid) {
     logger.warn(`Executor: bounty for ${prId} already paid`);
@@ -107,6 +162,43 @@ async function executeApprovedPr(prNumber) {
   } catch (err) {
     logger.error(`Executor: releaseBounty failed — ${err.message}`);
     return { merged: true, txHash: null, error: err.message };
+  }
+}
+
+/**
+ * Attempt to release a bounty for a PR that was already merged externally.
+ * Does NOT attempt to merge (PR is already closed). If no wallet is found,
+ * posts a comment so the contributor knows what to do.
+ *
+ * @param {number} prNumber
+ * @returns {{ txHash: string | null, error: string | null }}
+ */
+async function releaseExternallyMergedPr(prNumber) {
+  const prId = buildPrId(prNumber);
+  logger.info(`Executor: attempting bounty release for externally merged PR #${prNumber} (${prId})`);
+
+  const wallet = await resolveContributorWallet(prNumber);
+  if (!wallet) {
+    logger.warn(`Executor: externally merged PR #${prNumber} has no wallet — posting no-payout note`);
+    await postMergedNoWalletComment(prNumber);
+    return { txHash: null, error: "No wallet — contributor notified via comment" };
+  }
+
+  const alreadyPaid = await contract.isBountyPaid(prId);
+  if (alreadyPaid) {
+    logger.warn(`Executor: bounty for ${prId} already paid`);
+    return { txHash: null, error: "Bounty already paid" };
+  }
+
+  try {
+    const receipt = await contract.releaseBounty(prId, wallet);
+    logger.info(
+      `Executor: bounty released for externally merged PR #${prNumber} → ${wallet} | tx ${receipt.hash}`
+    );
+    return { txHash: receipt.hash, error: null };
+  } catch (err) {
+    logger.error(`Executor: releaseBounty failed — ${err.message}`);
+    return { txHash: null, error: err.message };
   }
 }
 
@@ -128,4 +220,4 @@ async function postJudgeComment(prNumber, verdict, reason) {
   }
 }
 
-module.exports = { executeApprovedPr, postJudgeComment, buildPrId };
+module.exports = { executeApprovedPr, releaseExternallyMergedPr, postJudgeComment, buildPrId };

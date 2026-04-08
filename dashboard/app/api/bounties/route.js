@@ -75,6 +75,14 @@ export async function GET() {
       } catch { /* non-fatal — tx links just won't appear */ }
     }
 
+    // GitHub auth headers reused for comment fetching below
+    const ghHeaders = {
+      Accept: "application/vnd.github.v3+json",
+      ...(process.env.GITHUB_TOKEN
+        ? { Authorization: `token ${process.env.GITHUB_TOKEN}` }
+        : {}),
+    };
+
     const bounties = await Promise.all(
       issues
         .filter((issue) => !issue.pull_request) // skip PRs
@@ -92,6 +100,7 @@ export async function GET() {
           let paidTo = null;
           let txHash = null;
           let paymentBlock = null;
+          let onChainAmountWei = 0n;
           if (contract) {
             try {
               const paid = await contract.bountyPaid(prId);
@@ -107,6 +116,7 @@ export async function GET() {
                 }
               } else {
                 const amt = await contract.bounties(prId);
+                onChainAmountWei = amt;
                 if (amt > 0n) onChainStatus = "funded";
               }
             } catch {
@@ -114,8 +124,50 @@ export async function GET() {
             }
           }
 
-          // Only mark completed if on-chain bountyPaid is true
-          // GitHub issue being closed does NOT mean the bounty was paid
+          // ── Detect "resolved without payout" ─────────────────────────────
+          // If the GitHub issue is closed but the bounty was never paid on-chain,
+          // the PR was merged (or issue closed) without a wallet address being provided.
+          let noPayoutNote = null;
+          if (issue.state === "closed" && onChainStatus !== "completed") {
+            onChainStatus = "no_payout";
+            noPayoutNote = "This issue was resolved but no Etherlink wallet address was provided — no XTZ was paid out.";
+          }
+
+          // ── Detect volatility-reduced bounty ─────────────────────────────
+          // If the on-chain amount is significantly less than the requested amount,
+          // fetch issue comments to find the agent's volatility explanation.
+          let volatilityNote = null;
+          if (onChainAmountWei > 0n && reward > 0) {
+            const requestedWei = ethers.parseEther(String(reward));
+            // More than 5% reduction signals an agent adjustment
+            if (onChainAmountWei < (requestedWei * 95n / 100n)) {
+              try {
+                const commentsRes = await fetch(
+                  `https://api.github.com/repos/${GITHUB_REPO}/issues/${issue.number}/comments?per_page=100`,
+                  { headers: ghHeaders, next: { revalidate: 300 } }
+                );
+                if (commentsRes.ok) {
+                  const comments = await commentsRes.json();
+                  for (const c of comments) {
+                    const volMatch = c.body?.match(
+                      /<!-- SOVEREIGN:VOLATILITY_REDUCED originalXtz=([\d.]+) advisedXtz=([\d.]+) -->/
+                    );
+                    if (volMatch) {
+                      volatilityNote = `Bounty reduced from ${volMatch[1]} XTZ → ${volMatch[2]} XTZ by the agent due to high treasury volatility at posting time.`;
+                      break;
+                    }
+                  }
+                  // Fallback: infer from ~50% reduction even if comment wasn't posted
+                  if (!volatilityNote) {
+                    const ratio = Number((onChainAmountWei * 100n) / requestedWei);
+                    if (ratio >= 44 && ratio <= 56) {
+                      volatilityNote = `Bounty reduced ~50% by the agent due to high treasury volatility at posting time.`;
+                    }
+                  }
+                }
+              } catch { /* non-fatal */ }
+            }
+          }
 
           // Extract task description (first ## Task section or first paragraph)
           const taskMatch = body.match(/##\s*task\s*\n([\s\S]*?)(?=\n##|\nbounty|\nPR:|$)/i);
@@ -136,6 +188,8 @@ export async function GET() {
             paidTo,
             txHash,
             paymentBlock,
+            volatilityNote,
+            noPayoutNote,
             createdAt: issue.created_at,
             labels: issue.labels.map((l) => l.name),
           };

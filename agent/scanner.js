@@ -85,6 +85,34 @@ function parsePrId(body = "", issueNumber) {
 }
 
 /**
+ * Post a comment on the bounty issue explaining a volatility-driven reduction.
+ */
+async function postVolatilityComment(issueNumber, originalXtz, advisedXtz) {
+  try {
+    const body =
+      `### ⚡ SOVEREIGN Financial Alert — Bounty Adjusted\n\n` +
+      `The treasury balance showed **high volatility** when this bounty was posted. ` +
+      `To protect the treasury, the bounty has been reduced by 50%:\n\n` +
+      `| | Amount |\n|---|---|\n` +
+      `| Requested | **${originalXtz} XTZ** |\n` +
+      `| Posted on-chain | **${advisedXtz} XTZ** |\n\n` +
+      `_This is an autonomous decision by the SOVEREIGN agent. ` +
+      `Once volatility normalises the full amount may be available for future bounties._\n\n` +
+      `<!-- SOVEREIGN:VOLATILITY_REDUCED originalXtz=${originalXtz} advisedXtz=${advisedXtz} -->`;
+
+    await octokit.issues.createComment({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      issue_number: issueNumber,
+      body,
+    });
+    logger.info(`Scanner: posted volatility note on issue #${issueNumber}`);
+  } catch (err) {
+    logger.warn(`Scanner: could not post volatility comment — ${err.message}`);
+  }
+}
+
+/**
  * Single scan pass.
  */
 async function scan() {
@@ -132,13 +160,15 @@ async function scan() {
     }
 
     // Consult financial awareness before posting
-    const advisedAmount = await financial.adviseBountyAmount(amount);
-    if (advisedAmount === null) {
+    const advised = await financial.adviseBountyAmount(amount);
+    if (advised === null) {
       logger.warn(
         `Scanner: financial advisor refused bounty for ${prId} — treasury below life-support`
       );
       continue;
     }
+
+    const { amount: advisedAmount, reason: adjustReason } = advised;
 
     if (advisedAmount <= 0) {
       logger.warn(`Scanner: advised bounty amount is 0 for ${prId}, skipping`);
@@ -147,11 +177,16 @@ async function scan() {
 
     try {
       await contract.postBounty(prId, advisedAmount);
-      if (advisedAmount !== amount) {
-        logger.info(`Scanner: bounty adjusted by financial advisor: ${amount} → ${advisedAmount} XTZ`);
-      }
       postedIssues.add(issue.number);
-      logger.info(`Scanner: bounty posted for issue #${issue.number} (${prId}) — ${amount} XTZ`);
+
+      if (adjustReason === "high_volatility") {
+        logger.info(`Scanner: bounty reduced by financial advisor (volatility): ${amount} → ${advisedAmount} XTZ`);
+        await postVolatilityComment(issue.number, amount, advisedAmount);
+      } else if (adjustReason === "capped") {
+        logger.info(`Scanner: bounty capped to spendable balance: ${amount} → ${advisedAmount} XTZ`);
+      } else {
+        logger.info(`Scanner: bounty posted for issue #${issue.number} (${prId}) — ${advisedAmount} XTZ`);
+      }
     } catch (err) {
       logger.error(`Scanner: failed to post bounty for ${prId} — ${err.message}`);
     }

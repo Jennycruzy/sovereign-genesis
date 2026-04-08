@@ -119,10 +119,9 @@ async function handleEvent(event, payload) {
     // PR was merged outside the agent (e.g. manually) → attempt bounty release
     case "closed":
       if (pr.merged) {
-        logger.info(`Webhook: PR #${prNumber} manually merged — attempting bounty release`);
-        const { ethers } = require("ethers");
-        const executor   = require("../agent/executor");
-        const prId       = executor.buildPrId(prNumber);
+        logger.info(`Webhook: PR #${prNumber} externally merged — attempting bounty release`);
+        const executor = require("../agent/executor");
+        const prId     = executor.buildPrId(prNumber);
 
         // Check if there is a bounty to release
         const bountyAmount = await contract.getBountyAmount(prId);
@@ -133,9 +132,11 @@ async function handleEvent(event, payload) {
           break;
         }
 
-        const result = await executor.executeApprovedPr(prNumber);
+        // Use releaseExternallyMergedPr — does NOT attempt a second merge,
+        // and posts an informative comment if no wallet address is found.
+        const result = await executor.releaseExternallyMergedPr(prNumber);
         if (result.error) {
-          logger.error(`Webhook: bounty release error — ${result.error}`);
+          logger.warn(`Webhook: bounty release issue for PR #${prNumber} — ${result.error}`);
         } else {
           logger.info(`Webhook: bounty released for PR #${prNumber} tx=${result.txHash}`);
         }
