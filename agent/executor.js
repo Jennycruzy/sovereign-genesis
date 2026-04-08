@@ -7,11 +7,13 @@
  *   3. Call releaseBounty() on-chain
  */
 const { Octokit } = require("@octokit/rest");
-const contract    = require("./contract");
-const logger      = require("./logger");
+const contract = require("./contract");
+const logger = require("./logger");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
-const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split("/");
+const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
+  "/"
+);
 
 /**
  * Attempt to extract a wallet address from PR comments.
@@ -20,10 +22,10 @@ const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
  */
 async function resolveContributorWallet(prNumber) {
   const { data: comments } = await octokit.issues.listComments({
-    owner:       REPO_OWNER,
-    repo:        REPO_NAME,
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
     issue_number: prNumber,
-    per_page:    100,
+    per_page: 100,
   });
 
   for (const comment of comments.reverse()) {
@@ -33,8 +35,8 @@ async function resolveContributorWallet(prNumber) {
 
   // Fall back to the PR description
   const { data: pr } = await octokit.pulls.get({
-    owner:       REPO_OWNER,
-    repo:        REPO_NAME,
+    owner: REPO_OWNER,
+    repo: REPO_NAME,
     pull_number: prNumber,
   });
   const match = pr.body?.match(/wallet[:\s]+(0x[a-fA-F0-9]{40})/i);
@@ -63,9 +65,9 @@ async function executeApprovedPr(prNumber) {
   // ── 1. Merge the PR ───────────────────────────────────────────────────────
   try {
     const { data: mergeResult } = await octokit.pulls.merge({
-      owner:        REPO_OWNER,
-      repo:         REPO_NAME,
-      pull_number:  prNumber,
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      pull_number: prNumber,
       merge_method: "squash",
       commit_title: `[SOVEREIGN] Auto-merge PR #${prNumber}`,
     });
@@ -86,7 +88,7 @@ async function executeApprovedPr(prNumber) {
   if (!wallet) {
     logger.warn(
       `Executor: PR #${prNumber} merged but no wallet address found. ` +
-      "Bounty NOT released. Contributor must claim manually."
+        "Bounty NOT released. Contributor must claim manually."
     );
     return { merged: true, txHash: null, error: "No contributor wallet found" };
   }
@@ -114,12 +116,12 @@ async function executeApprovedPr(prNumber) {
  * Post a review comment on the PR with the judge verdict.
  */
 async function postJudgeComment(prNumber, verdict, reason) {
-  const icon   = verdict === "PASS" ? "✅" : "❌";
-  const body   = `### SOVEREIGN-GENESIS AI Review\n\n${icon} **Verdict: ${verdict}**\n\n> ${reason}`;
+  const icon = verdict === "PASS" ? "✅" : "❌";
+  const body = `### SOVEREIGN-GENESIS AI Review\n\n${icon} **Verdict: ${verdict}**\n\n> ${reason}`;
   try {
     await octokit.issues.createComment({
-      owner:        REPO_OWNER,
-      repo:         REPO_NAME,
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
       issue_number: prNumber,
       body,
     });

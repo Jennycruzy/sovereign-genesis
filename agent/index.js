@@ -7,14 +7,16 @@
  *   - PR review queue (judge + auto-merge)
  *   - Financial awareness loop (invest surplus, health reports)
  */
-require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+require("dotenv").config({
+  path: require("path").join(__dirname, "..", ".env"),
+});
 
-const contract   = require("./contract");
-const scanner    = require("./scanner");
-const judge      = require("./judge");
-const executor   = require("./executor");
-const financial  = require("./financial");
-const logger     = require("./logger");
+const contract = require("./contract");
+const scanner = require("./scanner");
+const judge = require("./judge");
+const executor = require("./executor");
+const financial = require("./financial");
+const logger = require("./logger");
 
 // ── Startup validation ────────────────────────────────────────────────────────
 
@@ -56,13 +58,17 @@ async function enqueuePrReview(prNumber) {
     if (verdict === "PASS") {
       const result = await executor.executeApprovedPr(prNumber);
       if (result.error) {
-        logger.error(`Agent: execution error for PR #${prNumber} — ${result.error}`);
+        logger.error(
+          `Agent: execution error for PR #${prNumber} — ${result.error}`
+        );
       }
     } else {
       logger.info(`Agent: PR #${prNumber} rejected — ${reason}`);
     }
   } catch (err) {
-    logger.error(`Agent: unhandled error reviewing PR #${prNumber} — ${err.message}`);
+    logger.error(
+      `Agent: unhandled error reviewing PR #${prNumber} — ${err.message}`
+    );
   } finally {
     reviewQueue.delete(prNumber);
   }
@@ -89,7 +95,10 @@ async function bootstrap() {
   scanner.start(scanInterval);
 
   // Financial awareness loop (every FINANCIAL_INTERVAL_MS, default 5 min)
-  const finInterval = parseInt(process.env.FINANCIAL_INTERVAL_MS || "300000", 10);
+  const finInterval = parseInt(
+    process.env.FINANCIAL_INTERVAL_MS || "300000",
+    10
+  );
   setInterval(async () => {
     await financial.printHealthReport();
     await financial.maybeInvest();

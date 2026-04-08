@@ -19,9 +19,15 @@ async function main() {
     process.env.LIFE_SUPPORT_BUFFER_XTZ || "1"
   );
 
-  console.log("\n─── Deploy parameters ───────────────────────────────────────");
+  console.log(
+    "\n─── Deploy parameters ───────────────────────────────────────"
+  );
   console.log("  Agent address      :", agentAddress);
-  console.log("  Life-support buffer:", ethers.formatEther(lifeSupportBuffer), "XTZ");
+  console.log(
+    "  Life-support buffer:",
+    ethers.formatEther(lifeSupportBuffer),
+    "XTZ"
+  );
   console.log("────────────────────────────────────────────────────────────\n");
 
   // ── Deploy ────────────────────────────────────────────────────────────────
@@ -37,7 +43,7 @@ async function main() {
   if (seedXtz && parseFloat(seedXtz) > 0) {
     console.log(`\nSeeding treasury with ${seedXtz} XTZ…`);
     const tx = await deployer.sendTransaction({
-      to:    contractAddress,
+      to: contractAddress,
       value: ethers.parseEther(seedXtz),
     });
     await tx.wait();
@@ -48,7 +54,7 @@ async function main() {
   const artifact = await hre.artifacts.readArtifact("SovereignAgent");
   const deployment = {
     address: contractAddress,
-    abi:     artifact.abi,
+    abi: artifact.abi,
     network: hre.network.name,
     deployedAt: new Date().toISOString(),
   };

@@ -5,15 +5,17 @@
  * Parses the bounty amount from the issue body or uses configured label mappings.
  * Calls postBounty() on the smart contract for any new (unseen) bounties.
  */
-const { ethers }   = require("ethers");
-const { Octokit }  = require("@octokit/rest");
-const contract     = require("./contract");
-const financial    = require("./financial");
-const logger       = require("./logger");
+const { ethers } = require("ethers");
+const { Octokit } = require("@octokit/rest");
+const contract = require("./contract");
+const financial = require("./financial");
+const logger = require("./logger");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
-const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split("/");
+const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
+  "/"
+);
 
 /**
  * BOUNTY_LABELS configuration.
@@ -21,16 +23,18 @@ const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
  * Example: Bounty:Small:0.5,Bounty:Large:5.0
  * If an issue has multiple matching labels, the largest amount is chosen.
  */
-const BOUNTY_LABEL_MAP = (process.env.BOUNTY_LABELS || "Bounty").split(",").reduce((acc, part) => {
-  const [label, amountStr] = part.split(":");
-  // Support simple "Bounty" label with no amount (fallback to parsing body)
-  if (!amountStr) {
-    acc[label.trim()] = null;
-  } else {
-    acc[label.trim()] = parseFloat(amountStr);
-  }
-  return acc;
-}, {});
+const BOUNTY_LABEL_MAP = (process.env.BOUNTY_LABELS || "Bounty")
+  .split(",")
+  .reduce((acc, part) => {
+    const [label, amountStr] = part.split(":");
+    // Support simple "Bounty" label with no amount (fallback to parsing body)
+    if (!amountStr) {
+      acc[label.trim()] = null;
+    } else {
+      acc[label.trim()] = parseFloat(amountStr);
+    }
+    return acc;
+  }, {});
 
 const SCAN_LABELS = Object.keys(BOUNTY_LABEL_MAP).join(",");
 
@@ -52,7 +56,9 @@ function getBountyAmount(issue) {
   let labelAmount = 0;
   let hasLabelMatch = false;
 
-  const issueLabels = (issue.labels || []).map(l => typeof l === 'string' ? l : l.name);
+  const issueLabels = (issue.labels || []).map((l) =>
+    typeof l === "string" ? l : l.name
+  );
 
   for (const label of issueLabels) {
     if (label in BOUNTY_LABEL_MAP) {
@@ -95,18 +101,19 @@ async function scan() {
     // We scan for all configured labels
     for (const label of Object.keys(BOUNTY_LABEL_MAP)) {
       const { data } = await octokit.issues.listForRepo({
-        owner:  REPO_OWNER,
-        repo:   REPO_NAME,
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
         labels: label,
-        state:  "open",
+        state: "open",
         per_page: 100,
       });
       issues.push(...data);
     }
-    
+
     // Deduplicate issues by number
-    issues = Array.from(new Map(issues.map(item => [item.number, item])).values());
-    
+    issues = Array.from(
+      new Map(issues.map((item) => [item.number, item])).values()
+    );
   } catch (err) {
     logger.error(`Scanner: GitHub API error — ${err.message}`);
     return;
@@ -117,7 +124,9 @@ async function scan() {
 
     const amount = getBountyAmount(issue);
     if (!amount) {
-      logger.warn(`Scanner: issue #${issue.number} has no parseable bounty amount (via labels or body), skipping`);
+      logger.warn(
+        `Scanner: issue #${issue.number} has no parseable bounty amount (via labels or body), skipping`
+      );
       continue;
     }
 
@@ -148,12 +157,18 @@ async function scan() {
     try {
       await contract.postBounty(prId, advisedAmount);
       if (advisedAmount !== amount) {
-        logger.info(`Scanner: bounty adjusted by financial advisor: ${amount} → ${advisedAmount} XTZ`);
+        logger.info(
+          `Scanner: bounty adjusted by financial advisor: ${amount} → ${advisedAmount} XTZ`
+        );
       }
       postedIssues.add(issue.number);
-      logger.info(`Scanner: bounty posted for issue #${issue.number} (${prId}) — ${amount} XTZ`);
+      logger.info(
+        `Scanner: bounty posted for issue #${issue.number} (${prId}) — ${amount} XTZ`
+      );
     } catch (err) {
-      logger.error(`Scanner: failed to post bounty for ${prId} — ${err.message}`);
+      logger.error(
+        `Scanner: failed to post bounty for ${prId} — ${err.message}`
+      );
     }
   }
 }

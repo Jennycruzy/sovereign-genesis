@@ -50,9 +50,14 @@ export async function GET() {
 
     if (deployment) {
       provider = new ethers.JsonRpcProvider(
-        process.env.NEXT_PUBLIC_ETHERLINK_RPC || "https://node.shadownet.etherlink.com"
+        process.env.NEXT_PUBLIC_ETHERLINK_RPC ||
+          "https://node.shadownet.etherlink.com"
       );
-      contract = new ethers.Contract(deployment.address, deployment.abi, provider);
+      contract = new ethers.Contract(
+        deployment.address,
+        deployment.abi,
+        provider
+      );
 
       // Batch-fetch all BountyReleased events once so we can attach txHash to paid bounties
       try {
@@ -69,10 +74,15 @@ export async function GET() {
           });
           for (const log of chunk) {
             const topic1 = log.topics[1]; // keccak256(githubPrId)
-            releaseMap[topic1] = { txHash: log.transactionHash, blockNumber: log.blockNumber };
+            releaseMap[topic1] = {
+              txHash: log.transactionHash,
+              blockNumber: log.blockNumber,
+            };
           }
         }
-      } catch { /* non-fatal — tx links just won't appear */ }
+      } catch {
+        /* non-fatal — tx links just won't appear */
+      }
     }
 
     const bounties = await Promise.all(
@@ -118,7 +128,9 @@ export async function GET() {
           // GitHub issue being closed does NOT mean the bounty was paid
 
           // Extract task description (first ## Task section or first paragraph)
-          const taskMatch = body.match(/##\s*task\s*\n([\s\S]*?)(?=\n##|\nbounty|\nPR:|$)/i);
+          const taskMatch = body.match(
+            /##\s*task\s*\n([\s\S]*?)(?=\n##|\nbounty|\nPR:|$)/i
+          );
           const description = taskMatch
             ? taskMatch[1].trim()
             : body.split("\n").filter(Boolean)[0] || issue.title;
@@ -145,6 +157,9 @@ export async function GET() {
     return NextResponse.json({ bounties });
   } catch (err) {
     console.error("Bounties API error:", err.message);
-    return NextResponse.json({ bounties: [], error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { bounties: [], error: err.message },
+      { status: 500 }
+    );
   }
 }

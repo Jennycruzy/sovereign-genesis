@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class',
+  darkMode: "class",
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -10,7 +10,7 @@ module.exports = {
       colors: {
         // Neon purple palette
         sovereign: {
-          50:  "#f5f3ff",
+          50: "#f5f3ff",
           100: "#ede9fe",
           200: "#ddd6fe",
           300: "#c4b5fd",
@@ -24,7 +24,7 @@ module.exports = {
         },
         // Tezos blue palette
         tezos: {
-          50:  "#eff6ff",
+          50: "#eff6ff",
           100: "#dbeafe",
           200: "#bfdbfe",
           300: "#93c5fd",
@@ -38,9 +38,9 @@ module.exports = {
         },
         neon: {
           purple: "#c026d3",
-          blue:   "#0ea5e9",
-          green:  "#10b981",
-          red:    "#ef4444",
+          blue: "#0ea5e9",
+          green: "#10b981",
+          red: "#ef4444",
         },
         // Light mode colors
         light: {
@@ -52,24 +52,28 @@ module.exports = {
         },
       },
       backgroundImage: {
-        "grid-dark": "linear-gradient(rgba(139,92,246,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.07) 1px, transparent 1px)",
-        "grid-light": "linear-gradient(rgba(139,92,246,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.03) 1px, transparent 1px)",
+        "grid-dark":
+          "linear-gradient(rgba(139,92,246,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.07) 1px, transparent 1px)",
+        "grid-light":
+          "linear-gradient(rgba(139,92,246,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.03) 1px, transparent 1px)",
       },
       backgroundSize: {
         grid: "40px 40px",
       },
       animation: {
-        pulse:     "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
-        "glow":    "glow 2s ease-in-out infinite alternate",
-        "scan":    "scan 3s linear infinite",
+        pulse: "pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        glow: "glow 2s ease-in-out infinite alternate",
+        scan: "scan 3s linear infinite",
       },
       keyframes: {
         glow: {
           from: { boxShadow: "0 0 5px #8b5cf6, 0 0 10px #8b5cf6" },
-          to:   { boxShadow: "0 0 20px #8b5cf6, 0 0 40px #8b5cf6, 0 0 60px #c026d3" },
+          to: {
+            boxShadow: "0 0 20px #8b5cf6, 0 0 40px #8b5cf6, 0 0 60px #c026d3",
+          },
         },
         scan: {
-          "0%":   { transform: "translateY(-100%)" },
+          "0%": { transform: "translateY(-100%)" },
           "100%": { transform: "translateY(100vh)" },
         },
       },

@@ -97,15 +97,15 @@ sovereign-genesis/
 
 Deployed on Etherlink EVM (Solidity ^0.8.20, OpenZeppelin ReentrancyGuard).
 
-| Function | Access | Description |
-|---|---|---|
-| `postBounty(prId, amount)` | agent only | Escrow XTZ for a GitHub PR |
-| `releaseBounty(prId, contributor)` | agent only | Pay contributor and mark bounty paid |
-| `investSurplus(target)` | agent only | Forward spendable surplus to a DeFi protocol |
-| `setLifeSupportBuffer(amount)` | agent only | Update the minimum treasury reserve |
-| `setAgent(newAgent)` | agent only | Rotate the agent wallet address |
-| `spendableBalance()` | public view | Treasury balance minus life-support reserve |
-| `treasuryBalance()` | public view | Full contract balance |
+| Function                           | Access      | Description                                  |
+| ---------------------------------- | ----------- | -------------------------------------------- |
+| `postBounty(prId, amount)`         | agent only  | Escrow XTZ for a GitHub PR                   |
+| `releaseBounty(prId, contributor)` | agent only  | Pay contributor and mark bounty paid         |
+| `investSurplus(target)`            | agent only  | Forward spendable surplus to a DeFi protocol |
+| `setLifeSupportBuffer(amount)`     | agent only  | Update the minimum treasury reserve          |
+| `setAgent(newAgent)`               | agent only  | Rotate the agent wallet address              |
+| `spendableBalance()`               | public view | Treasury balance minus life-support reserve  |
+| `treasuryBalance()`                | public view | Full contract balance                        |
 
 **Security model:** `onlyAgent` modifier on all write functions, reentrancy guard on fund transfers, checks-effects-interactions pattern throughout.
 
@@ -115,10 +115,10 @@ Deployed on Etherlink EVM (Solidity ^0.8.20, OpenZeppelin ReentrancyGuard).
 
 The agent applies these rules automatically before every bounty decision:
 
-| Condition | Action |
-|---|---|
-| `treasury ≤ lifeSupportBuffer` | Block bounty posting entirely |
-| Balance volatility > 20% | Reduce bounty by 50% |
+| Condition                            | Action                                      |
+| ------------------------------------ | ------------------------------------------- |
+| `treasury ≤ lifeSupportBuffer`       | Block bounty posting entirely               |
+| Balance volatility > 20%             | Reduce bounty by 50%                        |
 | `spendableBalance > investThreshold` | Call `investSurplus()` to grow the treasury |
 
 ---
@@ -188,16 +188,16 @@ cp .env.example .env
 # Edit .env and fill in all values
 ```
 
-| Variable | Description |
-|---|---|
-| `ETHERLINK_RPC` | Etherlink RPC URL |
-| `DEPLOYER_PRIVATE_KEY` | Wallet key for deploying the contract |
-| `AGENT_PRIVATE_KEY` | Wallet key the agent uses to operate the contract |
-| `GITHUB_TOKEN` | GitHub PAT |
-| `GITHUB_REPO` | `owner/repo` to watch |
-| `GITHUB_WEBHOOK_SECRET` | Shared secret for webhook HMAC verification |
-| `OPENAI_API_KEY` | OpenAI API key for the AI judge |
-| `YIELD_TARGET_ADDRESS` | (Optional) DeFi pool address for surplus investment |
+| Variable                 | Description                                                                  |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `ETHERLINK_RPC`          | Etherlink RPC URL                                                            |
+| `DEPLOYER_PRIVATE_KEY`   | Wallet key for deploying the contract                                        |
+| `AGENT_PRIVATE_KEY`      | Wallet key the agent uses to operate the contract                            |
+| `GITHUB_TOKEN`           | GitHub PAT                                                                   |
+| `GITHUB_REPO`            | `owner/repo` to watch                                                        |
+| `GITHUB_WEBHOOK_SECRET`  | Shared secret for webhook HMAC verification                                  |
+| `OPENAI_API_KEY`         | OpenAI API key for the AI judge                                              |
+| `YIELD_TARGET_ADDRESS`   | (Optional) DeFi pool address for surplus investment                          |
 | `INVEST_THRESHOLD_RATIO` | (Optional) Fraction of buffer above which surplus is invested (default: 0.5) |
 
 ### 3. Compile and deploy the contract
@@ -221,6 +221,7 @@ docker compose up -d
 ```
 
 This starts three containers:
+
 - `dashboard` — Next.js app on port 3000
 - `webhook` — GitHub webhook receiver on port 3001
 - `agent` — The autonomous agent loop
@@ -257,10 +258,10 @@ See the [Netlify Deployment Guide](#netlify-deployment-guide) section below for 
 
 ## Networks
 
-| Network | Chain ID | RPC |
-|---|---|---|
-| Etherlink Ghostnet | 128123 | `https://node.ghostnet.etherlink.com` |
-| Etherlink Mainnet | 42793 | `https://node.mainnet.etherlink.com` |
+| Network            | Chain ID | RPC                                   |
+| ------------------ | -------- | ------------------------------------- |
+| Etherlink Ghostnet | 128123   | `https://node.ghostnet.etherlink.com` |
+| Etherlink Mainnet  | 42793    | `https://node.mainnet.etherlink.com`  |
 
 Block explorer: `https://shadownet.explorer.etherlink.com`
 
@@ -286,11 +287,11 @@ The dashboard is a Next.js 14 app and can be deployed to Netlify using the Next.
 
 In Site settings → Environment variables, add:
 
-| Key | Value |
-|---|---|
-| `NEXT_PUBLIC_ETHERLINK_RPC` | Your Etherlink RPC URL |
-| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `5000` |
-| `GITHUB_TOKEN` | Your GitHub PAT |
+| Key                            | Value                  |
+| ------------------------------ | ---------------------- |
+| `NEXT_PUBLIC_ETHERLINK_RPC`    | Your Etherlink RPC URL |
+| `NEXT_PUBLIC_POLL_INTERVAL_MS` | `5000`                 |
+| `GITHUB_TOKEN`                 | Your GitHub PAT        |
 
 **4. Install the Next.js Netlify plugin**
 

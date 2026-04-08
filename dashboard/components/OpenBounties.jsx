@@ -3,22 +3,40 @@
 import { useEffect, useState, useCallback } from "react";
 
 const STATUS_STYLE = {
-  open:      { badge: "OPEN",    color: "text-amber-400",   bg: "bg-amber-900/30 border-amber-700/40",   dot: "bg-amber-400 animate-pulse" },
-  funded:    { badge: "FUNDED",  color: "text-tezos-400",   bg: "bg-tezos-900/30 border-tezos-700/40",   dot: "bg-tezos-400 animate-pulse" },
-  completed: { badge: "PAID",    color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-700/40", dot: "bg-emerald-400" },
+  open: {
+    badge: "OPEN",
+    color: "text-amber-400",
+    bg: "bg-amber-900/30 border-amber-700/40",
+    dot: "bg-amber-400 animate-pulse",
+  },
+  funded: {
+    badge: "FUNDED",
+    color: "text-tezos-400",
+    bg: "bg-tezos-900/30 border-tezos-700/40",
+    dot: "bg-tezos-400 animate-pulse",
+  },
+  completed: {
+    badge: "PAID",
+    color: "text-emerald-400",
+    bg: "bg-emerald-900/30 border-emerald-700/40",
+    dot: "bg-emerald-400",
+  },
 };
 
 export default function OpenBounties() {
   const [bounties, setBounties] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
 
   const fetch_ = useCallback(async () => {
     try {
       const res = await fetch("/api/bounties", { cache: "no-store" });
       const json = await res.json();
       setBounties(json.bounties || []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -27,8 +45,8 @@ export default function OpenBounties() {
     return () => clearInterval(id);
   }, [fetch_]);
 
-  const open    = bounties.filter((b) => b.status !== "completed");
-  const closed  = bounties.filter((b) => b.status === "completed");
+  const open = bounties.filter((b) => b.status !== "completed");
+  const closed = bounties.filter((b) => b.status === "completed");
 
   return (
     <div className="space-y-6">
@@ -48,12 +66,18 @@ export default function OpenBounties() {
               </span>
             )}
           </div>
-          {loading && <span className="text-xs text-slate-500 animate-pulse">loading…</span>}
+          {loading && (
+            <span className="text-xs text-slate-500 animate-pulse">
+              loading…
+            </span>
+          )}
         </div>
 
         {/* How to submit */}
         <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 mb-6">
-          <h3 className="text-sm font-bold text-slate-300 mb-2">How to Contribute</h3>
+          <h3 className="text-sm font-bold text-slate-300 mb-2">
+            How to Contribute
+          </h3>
           <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
             <li>Fork the repository and complete the bounty task</li>
             <li>Open a Pull Request against the main branch</li>
@@ -64,7 +88,9 @@ export default function OpenBounties() {
               </code>
             </li>
             <li>The AI judge reviews your code automatically</li>
-            <li>If approved, your PR is merged and XTZ is sent to your wallet</li>
+            <li>
+              If approved, your PR is merged and XTZ is sent to your wallet
+            </li>
           </ol>
         </div>
 
@@ -98,7 +124,9 @@ function BountyCard({ bounty }) {
           </h3>
           <span className="text-xs text-slate-600 mt-0.5">#{bounty.id}</span>
         </div>
-        <span className={`shrink-0 flex items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}>
+        <span
+          className={`shrink-0 flex items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}
+        >
           <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
           {s.badge}
         </span>
@@ -111,29 +139,38 @@ function BountyCard({ bounty }) {
 
       {/* Reward */}
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-600 uppercase tracking-wider">Reward:</span>
-        <span className="text-sm font-bold font-mono text-neon-blue">{bounty.reward}</span>
+        <span className="text-xs text-slate-600 uppercase tracking-wider">
+          Reward:
+        </span>
+        <span className="text-sm font-bold font-mono text-neon-blue">
+          {bounty.reward}
+        </span>
       </div>
 
       {/* Paid to (if completed) */}
-      {bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000" && (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-600 uppercase tracking-wider">Paid to:</span>
-            <span className="text-xs font-mono text-emerald-400 truncate">{bounty.paidTo}</span>
+      {bounty.paidTo &&
+        bounty.paidTo !== "0x0000000000000000000000000000000000000000" && (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-600 uppercase tracking-wider">
+                Paid to:
+              </span>
+              <span className="text-xs font-mono text-emerald-400 truncate">
+                {bounty.paidTo}
+              </span>
+            </div>
+            {bounty.txHash && (
+              <a
+                href={`https://shadownet.explorer.etherlink.com/tx/${bounty.txHash}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate ml-[calc(theme(spacing.2)+3.5rem)] -mt-0.5"
+              >
+                verify tx →
+              </a>
+            )}
           </div>
-          {bounty.txHash && (
-            <a
-              href={`https://shadownet.explorer.etherlink.com/tx/${bounty.txHash}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate ml-[calc(theme(spacing.2)+3.5rem)] -mt-0.5"
-            >
-              verify tx →
-            </a>
-          )}
-        </div>
-      )}
+        )}
 
       {/* Actions */}
       <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">

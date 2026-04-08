@@ -8,13 +8,15 @@
  *
  * Security: verifies GitHub HMAC-SHA256 webhook signature.
  */
-require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
+require("dotenv").config({
+  path: require("path").join(__dirname, "..", ".env"),
+});
 
-const express    = require("express");
+const express = require("express");
 const bodyParser = require("body-parser");
-const crypto     = require("crypto");
-const contract   = require("../agent/contract");
-const logger     = require("../agent/logger");
+const crypto = require("crypto");
+const contract = require("../agent/contract");
+const logger = require("../agent/logger");
 
 // ── The agent module is initialised lazily to allow the webhook to start ──────
 // independently from the full agent bootstrap (useful in split-process deploy).
@@ -27,7 +29,7 @@ function getAgent() {
   return agentModule;
 }
 
-const app  = express();
+const app = express();
 const PORT = process.env.WEBHOOK_PORT || 3001;
 const SECRET = process.env.GITHUB_WEBHOOK_SECRET;
 
@@ -45,7 +47,9 @@ app.use(
 function verifySignature(req, res, next) {
   if (!SECRET) {
     // Dev mode: skip verification if no secret configured
-    logger.warn("Webhook: GITHUB_WEBHOOK_SECRET not set — skipping signature check");
+    logger.warn(
+      "Webhook: GITHUB_WEBHOOK_SECRET not set — skipping signature check"
+    );
     return next();
   }
 
@@ -55,7 +59,8 @@ function verifySignature(req, res, next) {
     return res.status(401).json({ error: "Missing signature" });
   }
 
-  const expected = "sha256=" +
+  const expected =
+    "sha256=" +
     crypto.createHmac("sha256", SECRET).update(req.rawBody).digest("hex");
 
   const valid = crypto.timingSafeEqual(
@@ -80,7 +85,7 @@ app.get("/health", (_req, res) => {
 // ── Webhook endpoint ──────────────────────────────────────────────────────────
 
 app.post("/webhook", verifySignature, async (req, res) => {
-  const event   = req.headers["x-github-event"];
+  const event = req.headers["x-github-event"];
   const payload = req.body;
 
   logger.info(`Webhook: received event "${event}" action "${payload?.action}"`);
@@ -99,8 +104,8 @@ app.post("/webhook", verifySignature, async (req, res) => {
 async function handleEvent(event, payload) {
   if (event !== "pull_request") return;
 
-  const action   = payload.action;
-  const pr       = payload.pull_request;
+  const action = payload.action;
+  const pr = payload.pull_request;
   const prNumber = pr?.number;
 
   if (!prNumber) return;
@@ -119,14 +124,16 @@ async function handleEvent(event, payload) {
     // PR was merged outside the agent (e.g. manually) → attempt bounty release
     case "closed":
       if (pr.merged) {
-        logger.info(`Webhook: PR #${prNumber} manually merged — attempting bounty release`);
+        logger.info(
+          `Webhook: PR #${prNumber} manually merged — attempting bounty release`
+        );
         const { ethers } = require("ethers");
-        const executor   = require("../agent/executor");
-        const prId       = executor.buildPrId(prNumber);
+        const executor = require("../agent/executor");
+        const prId = executor.buildPrId(prNumber);
 
         // Check if there is a bounty to release
         const bountyAmount = await contract.getBountyAmount(prId);
-        const alreadyPaid  = await contract.isBountyPaid(prId);
+        const alreadyPaid = await contract.isBountyPaid(prId);
 
         if (bountyAmount === 0n || alreadyPaid) {
           logger.info(`Webhook: no pending bounty for ${prId}`);
@@ -137,7 +144,9 @@ async function handleEvent(event, payload) {
         if (result.error) {
           logger.error(`Webhook: bounty release error — ${result.error}`);
         } else {
-          logger.info(`Webhook: bounty released for PR #${prNumber} tx=${result.txHash}`);
+          logger.info(
+            `Webhook: bounty released for PR #${prNumber} tx=${result.txHash}`
+          );
         }
       }
       break;

@@ -3,9 +3,9 @@
  * Provides typed helpers for all on-chain operations.
  */
 const { ethers } = require("ethers");
-const fs         = require("fs");
-const path       = require("path");
-const logger     = require("./logger");
+const fs = require("fs");
+const path = require("path");
+const logger = require("./logger");
 
 let _provider;
 let _signer;
@@ -29,7 +29,7 @@ function init() {
   const deployment = loadDeployment();
 
   _provider = new ethers.JsonRpcProvider(process.env.ETHERLINK_RPC);
-  _signer   = new ethers.Wallet(process.env.AGENT_PRIVATE_KEY, _provider);
+  _signer = new ethers.Wallet(process.env.AGENT_PRIVATE_KEY, _provider);
   _contract = new ethers.Contract(deployment.address, deployment.abi, _signer);
 
   logger.info(`Contract client initialised at ${deployment.address}`);
@@ -37,7 +37,8 @@ function init() {
 }
 
 function getContract() {
-  if (!_contract) throw new Error("Call contract.init() before using the contract.");
+  if (!_contract)
+    throw new Error("Call contract.init() before using the contract.");
   return _contract;
 }
 
