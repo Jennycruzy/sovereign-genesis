@@ -140,24 +140,40 @@ async function scan() {
     return;
   }
 
+  // OPTIMIZED: Batch check all bounties first to reduce RPC calls
+  const candidatePrIds = [];
+  const issueMap = new Map();
+  
   for (const issue of issues) {
     if (postedIssues.has(issue.number)) continue;
-
+    
     const amount = getBountyAmount(issue);
     if (!amount) {
       logger.warn(`Scanner: issue #${issue.number} has no parseable bounty amount (via labels or body), skipping`);
       continue;
     }
-
+    
     const prId = parsePrId(issue.body || "", issue.number);
-
-    // Check whether it's already on-chain
-    const existing = await contract.getBountyAmount(prId);
-    const alreadyPaid = await contract.isBountyPaid(prId);
+    candidatePrIds.push(prId);
+    issueMap.set(prId, { issueNumber: issue.number, amount });
+  }
+  
+  // Batch check which bounties are already on-chain
+  const bountyStatuses = await contract.getBountiesBatch(candidatePrIds);
+  
+  for (const { prId, amount: existing, paid: alreadyPaid } of bountyStatuses) {
     if (existing > 0n || alreadyPaid) {
-      postedIssues.add(issue.number);
+      const issueInfo = issueMap.get(prId);
+      if (issueInfo) {
+        postedIssues.add(issueInfo.issueNumber);
+      }
       continue;
     }
+    
+    const issueInfo = issueMap.get(prId);
+    if (!issueInfo) continue;
+    
+    const { issueNumber, amount } = issueInfo;
 
     // Consult financial awareness before posting
     const advised = await financial.adviseBountyAmount(amount);
@@ -177,15 +193,15 @@ async function scan() {
 
     try {
       await contract.postBounty(prId, advisedAmount);
-      postedIssues.add(issue.number);
+      postedIssues.add(issueNumber);
 
       if (adjustReason === "high_volatility") {
         logger.info(`Scanner: bounty reduced by financial advisor (volatility): ${amount} → ${advisedAmount} XTZ`);
-        await postVolatilityComment(issue.number, amount, advisedAmount);
+        await postVolatilityComment(issueNumber, amount, advisedAmount);
       } else if (adjustReason === "capped") {
         logger.info(`Scanner: bounty capped to spendable balance: ${amount} → ${advisedAmount} XTZ`);
       } else {
-        logger.info(`Scanner: bounty posted for issue #${issue.number} (${prId}) — ${advisedAmount} XTZ`);
+        logger.info(`Scanner: bounty posted for issue #${issueNumber} (${prId}) — ${advisedAmount} XTZ`);
       }
     } catch (err) {
       logger.error(`Scanner: failed to post bounty for ${prId} — ${err.message}`);

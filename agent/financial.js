@@ -75,11 +75,9 @@ function isHighVolatility() {
  * Returns the (possibly reduced) amount in XTZ, or null if we should refuse.
  */
 async function adviseBountyAmount(requestedXtz) {
-  const [treasury, buffer, spendable] = await Promise.all([
-    contract.getTreasuryBalance(),
-    contract.getLifeSupportBuffer(),
-    contract.getSpendableBalance(),
-  ]);
+  // OPTIMIZED: Use batch state read to reduce RPC calls
+  const state = await contract.getTreasuryState();
+  const { treasuryBalance: treasury, lifeSupportBuffer: buffer, spendable } = state;
 
   recordBalance(treasury);
 
@@ -129,11 +127,9 @@ async function maybeInvest() {
     return;
   }
 
-  const [treasury, buffer, spendable] = await Promise.all([
-    contract.getTreasuryBalance(),
-    contract.getLifeSupportBuffer(),
-    contract.getSpendableBalance(),
-  ]);
+  // OPTIMIZED: Use batch state read to reduce RPC calls
+  const state = await contract.getTreasuryState();
+  const { treasuryBalance: treasury, lifeSupportBuffer: buffer, spendable } = state;
 
   recordBalance(treasury);
 
@@ -168,11 +164,9 @@ async function maybeInvest() {
 
 async function printHealthReport() {
   try {
-    const [treasury, buffer, spendable] = await Promise.all([
-      contract.getTreasuryBalance(),
-      contract.getLifeSupportBuffer(),
-      contract.getSpendableBalance(),
-    ]);
+    // OPTIMIZED: Use batch state read to reduce RPC calls
+    const state = await contract.getTreasuryState();
+    const { treasuryBalance: treasury, lifeSupportBuffer: buffer, spendable } = state;
 
     const vol = computeVolatility();
     const status = treasury <= buffer ? "CRITICAL" : "HEALTHY";
