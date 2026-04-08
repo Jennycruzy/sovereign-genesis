@@ -1,0 +1,59 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop # Assuming 'develop' is also a primary development branch
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x' # Using a recent LTS version of Node.js
+          cache: 'npm'         # Cache npm dependencies for faster builds
+
+      - name: Install dependencies
+        # This assumes a root package.json exists and contains all necessary
+        # dependencies for hardhat, agent, scripts, and dashboard.
+        run: npm install
+
+      - name: Run Hardhat Contract Tests
+        # This step executes tests located in the './test' directory,
+        # as configured in hardhat.config.js for smart contract validation.
+        # Ensure that 'hardhat' and '@nomicfoundation/hardhat-toolbox' are
+        # listed as dependencies in your package.json.
+        run: npx hardhat test
+
+      - name: Run Agent and Scripts Tests
+        # This step assumes that 'npm test' in the root package.json
+        # is configured to run unit tests specifically for the 'agent'
+        # and 'scripts' components. This is a common pattern where a single
+        # root script orchestrates tests for different parts of the project
+        # (e.g., using Jest to discover tests in agent/ and scripts/ directories).
+        #
+        # If 'agent' and 'scripts' are structured as independent npm packages
+        # with their own package.json files, you might need to modify this step
+        # to navigate into those directories and run 'npm install' (if not
+        # covered by the root install) and 'npm test' separately for each.
+        # Example for separate packages:
+        # - name: Run Agent Tests
+        #   run: |
+        #     cd agent
+        #     npm test
+        # - name: Run Scripts Tests
+        #   run: |
+        #     cd scripts
+        #     npm test
+        run: npm test
