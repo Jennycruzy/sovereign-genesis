@@ -9,6 +9,7 @@
  */
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
+const { ethers } = require("ethers");
 const contract   = require("./contract");
 const scanner    = require("./scanner");
 const judge      = require("./judge");
@@ -95,7 +96,52 @@ async function bootstrap() {
     await financial.maybeInvest();
   }, finInterval);
 
-  logger.info("Agent is live. Listening for GitHub events via webhook.");
+  // ── Real-time fund detection via log polling ──────────────────────────────
+  // eth_newFilter is disabled on Etherlink, so we poll getLogs every 15s
+  // instead of using contract.on(). This gives near-real-time response
+  // (within ~15s) to incoming deposits without waiting the full 5-min cycle.
+  const contractInstance = contract.getContract();
+  const provider         = contract.getProvider();
+  const receivedTopic    = ethers.id("Received(address,uint256)");
+  const contractAddress  = await contractInstance.getAddress();
+  let lastCheckedBlock   = await provider.getBlockNumber();
+
+  setInterval(async () => {
+    try {
+      const latest = await provider.getBlockNumber();
+      if (latest <= lastCheckedBlock) return;
+
+      const logs = await provider.getLogs({
+        address:   contractAddress,
+        topics:    [receivedTopic],
+        fromBlock: lastCheckedBlock + 1,
+        toBlock:   latest,
+      });
+
+      lastCheckedBlock = latest;
+
+      if (logs.length === 0) return;
+
+      // Decode and log each deposit
+      for (const log of logs) {
+        const decoded = contractInstance.interface.parseLog(log);
+        const xtz     = ethers.formatEther(decoded.args.amount);
+        logger.info(
+          `Agent: ⚡ received ${xtz} XTZ from ${decoded.args.sender} ` +
+          `(block ${log.blockNumber}) — triggering immediate financial check`
+        );
+      }
+
+      // React: invest surplus and re-scan for newly-fundable bounties
+      await financial.printHealthReport();
+      await financial.maybeInvest();
+      await scanner.scan();
+    } catch (err) {
+      logger.error(`Agent: fund-watch error — ${err.message}`);
+    }
+  }, 15_000); // poll every 15 seconds
+
+  logger.info("Agent is live. Listening for GitHub events and on-chain fund deposits.");
 }
 
 // Only run bootstrap when this file is the entry point, not when required
