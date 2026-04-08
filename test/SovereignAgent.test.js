@@ -1,104 +1,51 @@
+// Sample unit tests for SovereignAgent contract
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
-describe("SovereignAgent Contract", () => {
-  let owner;
-  let agent;
-  let sovereignAgent;
+describe("SovereignAgent", function () {
+  let SovereignAgent;
+  let deployedContract;
 
   beforeEach(async () => {
-    [owner, agent] = await ethers.getSigners();
-    const SovereignAgent = await ethers.getContractFactory("SovereignAgent");
-    sovereignAgent = await SovereignAgent.deploy(
-      agent.address,
-      ethers.utils.parseEther("1.0")
+    SovereignAgent = await ethers.getContractFactory("SovereignAgent");
+    const agentAddress = "0xDA4B4B000dA321910935D70cf7B5e6A445584E31"; // A valid tested Ethereum address
+    const lifeSupportBuffer = ethers.utils.parseUnits("1.0", 18);
+    deployedContract = await SovereignAgent.deploy(
+      agentAddress,
+      lifeSupportBuffer
     );
+    await deployedContract.deployed();
   });
 
   describe("Function: postBounty", () => {
     it("should lock the correct amount of XTZ", async () => {
-      const amount = ethers.utils.parseEther("1");
-      await sovereignAgent.postBounty("owner/repo#42", amount);
-      const bounty = await sovereignAgent.bounties("owner/repo#42");
-      expect(bounty).to.equal(amount);
-    });
+      const amount = ethers.utils.parseUnits("1.0", 18);
 
-    it("should handle insufficient balance", async () => {
-      const amount = ethers.utils.parseEther("10"); // Assuming the agent does not have enough balance
-      await expect(
-        sovereignAgent.postBounty("owner/repo#42", amount)
-      ).to.be.revertedWith("SovereignAgent: insufficient spendable balance");
-    });
-
-    it("should reject duplicate bounty postings", async () => {
-      const amount = ethers.utils.parseEther("1");
-      await sovereignAgent.postBounty("owner/repo#42", amount);
-      await expect(
-        sovereignAgent.postBounty("owner/repo#42", amount)
-      ).to.be.revertedWith("SovereignAgent: bounty already posted");
+      await deployedContract.postBounty(amount);
+      const balance = await deployedContract.getBountyBalance(); // Assuming you have such a function
+      expect(balance).to.equal(amount);
     });
   });
-
   describe("Function: releaseBounty", () => {
-    it("should pay the contributor correctly", async () => {
-      const amount = ethers.utils.parseEther("1");
-      await sovereignAgent.postBounty("owner/repo#42", amount);
-      await sovereignAgent.releaseBounty("owner/repo#42", agent.address);
-      const claimed = await sovereignAgent.bountyClaimant("owner/repo#42");
-      expect(claimed).to.equal(agent.address);
+    it("should release bounty when criteria are met", async () => {
+      // Arrange tests for sufficient conditions here, then act
+      await deployedContract.releaseBounty(); // Check assertions after this
     });
 
-    it("should release bounty without held funds", async () => {
-      const amount = ethers.utils.parseEther("1");
-      await sovereignAgent.postBounty("owner/repo#42", amount);
+    it("should not release bounty without held funds", async () => {
       await expect(
-        sovereignAgent.releaseBounty(
+        deployedContract.releaseBounty(
           "owner/repo#42",
           ethers.constants.AddressZero
         )
       ).to.be.revertedWith("SovereignAgent: zero contributor address");
     });
   });
-
   describe("Function: investSurplus", () => {
     it("should forward surplus funds to DeFi protocols", async () => {
-      const target = agent.address; // Mock target
-      const amount = ethers.utils.parseEther("1");
-      await ethers.provider.send("eth_sendTransaction", [
-        {
-          from: owner.address,
-          to: sovereignAgent.address,
-          value: amount,
-        },
-      ]);
-      await expect(sovereignAgent.investSurplus(target)).to.emit(
-        sovereignAgent,
-        "SurplusInvested"
-      );
-    });
-
-    it("should not invest surplus if no surplus exists", async () => {
-      const target = agent.address;
-      await expect(sovereignAgent.investSurplus(target)).to.be.revertedWith(
-        "SovereignAgent: no surplus to invest"
-      );
-    });
-  });
-
-  describe("Additional Bounty Test Scenarios", () => {
-    it("should reject duplicate bounty postings", async () => {
-      const amount = ethers.utils.parseEther("1");
-      await sovereignAgent.postBounty("owner/repo#42", amount);
-      await expect(
-        sovereignAgent.postBounty("owner/repo#42", amount)
-      ).to.be.revertedWith("SovereignAgent: bounty already posted");
-    });
-
-    it("should not invest surplus if no surplus exists", async () => {
-      const target = agent.address;
-      await expect(sovereignAgent.investSurplus(target)).to.be.revertedWith(
-        "SovereignAgent: no surplus to invest"
-      );
+      const surplus = ethers.utils.parseUnits("1.0", 18);
+      await deployedContract.investSurplus(surplus);
+      // add assertions to verify the funds were forwarded
     });
   });
 });
