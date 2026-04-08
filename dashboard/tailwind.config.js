@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -41,9 +42,18 @@ module.exports = {
           green:  "#10b981",
           red:    "#ef4444",
         },
+        // Light mode colors
+        light: {
+          bg: "#f8fafc",
+          card: "#ffffff",
+          border: "#e2e8f0",
+          text: "#1e293b",
+          muted: "#64748b",
+        },
       },
       backgroundImage: {
         "grid-dark": "linear-gradient(rgba(139,92,246,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.07) 1px, transparent 1px)",
+        "grid-light": "linear-gradient(rgba(139,92,246,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.03) 1px, transparent 1px)",
       },
       backgroundSize: {
         grid: "40px 40px",

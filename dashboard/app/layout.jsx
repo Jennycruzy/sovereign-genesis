@@ -8,14 +8,11 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#050509] text-slate-100 font-mono antialiased">
+      <body className="min-h-screen font-mono antialiased transition-colors duration-300 dark:bg-[#050509] dark:text-slate-100 bg-light-bg text-light-text">
         {/* Background grid */}
         <div
-          className="fixed inset-0 pointer-events-none"
+          className="fixed inset-0 pointer-events-none dark:bg-grid-dark bg-grid-light"
           style={{
-            backgroundImage:
-              "linear-gradient(rgba(139,92,246,0.05) 1px, transparent 1px)," +
-              "linear-gradient(90deg, rgba(139,92,246,0.05) 1px, transparent 1px)",
             backgroundSize: "40px 40px",
           }}
         />
