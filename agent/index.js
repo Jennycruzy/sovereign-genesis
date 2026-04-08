@@ -94,8 +94,9 @@ async function bootstrap() {
   const finInterval = parseInt(process.env.FINANCIAL_INTERVAL_MS || "300000", 10);
   setInterval(async () => {
     await financial.printHealthReport();
-    await financial.maybeInvest();
     await bountyCreator.maybeCreateBounties();
+    await scanner.scan();
+    await financial.maybeInvest();
   }, finInterval);
 
   // ── Real-time fund detection via log polling ──────────────────────────────
@@ -134,11 +135,13 @@ async function bootstrap() {
         );
       }
 
-      // React: invest surplus, scan for fundable bounties, create new ones
+      // React: create bounties first (while spendable is high), fund them,
+      // THEN invest whatever surplus remains. Order matters — invest eats
+      // all spendable, so bounty creation must come before it.
       await financial.printHealthReport();
-      await financial.maybeInvest();
-      await scanner.scan();
       await bountyCreator.maybeCreateBounties();
+      await scanner.scan();  // funds the newly-created bounty issues on-chain
+      await financial.maybeInvest();
     } catch (err) {
       logger.error(`Agent: fund-watch error — ${err.message}`);
     }
