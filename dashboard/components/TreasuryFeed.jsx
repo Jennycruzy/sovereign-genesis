@@ -26,7 +26,7 @@ export default function TreasuryFeed({ events = [], isLoading }) {
       </div>
 
       {/* Feed */}
-      <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 overscroll-contain">
         {events.length === 0 ? (
           <div className="text-center text-slate-600 text-sm py-8">
             No events yet. Deploy contract and fund treasury.
@@ -51,9 +51,9 @@ function EventRow({ event }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-sm font-bold ${meta.color}`}>{meta.label}</span>
+          <span className={`text-sm font-bold ${meta.color} truncate`}>{meta.label}</span>
           {event.blockNumber && (
-            <span className="text-xs text-slate-600">#{event.blockNumber}</span>
+            <span className="text-xs text-slate-600 shrink-0">#{event.blockNumber}</span>
           )}
         </div>
 
@@ -62,7 +62,7 @@ function EventRow({ event }) {
           {Object.entries(args).map(([k, v]) => (
             <div key={k} className="flex gap-2">
               <span className="text-slate-600 shrink-0">{k}:</span>
-              <span className="truncate font-mono">
+              <span className="truncate font-mono break-all">
                 {typeof v === "object" && v !== null ? (v.hash || JSON.stringify(v)) : String(v)}
               </span>
             </div>
