@@ -75,11 +75,8 @@ function isHighVolatility() {
  * Returns the (possibly reduced) amount in XTZ, or null if we should refuse.
  */
 async function adviseBountyAmount(requestedXtz) {
-  const [treasury, buffer, spendable] = await Promise.all([
-    contract.getTreasuryBalance(),
-    contract.getLifeSupportBuffer(),
-    contract.getSpendableBalance(),
-  ]);
+  // Use batched treasury state (1 multicall instead of 3 eth_calls)
+  const { treasury, buffer, spendable } = await contract.getTreasuryState();
 
   recordBalance(treasury);
 
@@ -126,11 +123,8 @@ async function maybeInvest() {
     return;
   }
 
-  const [treasury, buffer, spendable] = await Promise.all([
-    contract.getTreasuryBalance(),
-    contract.getLifeSupportBuffer(),
-    contract.getSpendableBalance(),
-  ]);
+  // Use batched treasury state (1 multicall instead of 3 eth_calls)
+  const { treasury, buffer, spendable } = await contract.getTreasuryState();
 
   recordBalance(treasury);
 
@@ -165,11 +159,8 @@ async function maybeInvest() {
 
 async function printHealthReport() {
   try {
-    const [treasury, buffer, spendable] = await Promise.all([
-      contract.getTreasuryBalance(),
-      contract.getLifeSupportBuffer(),
-      contract.getSpendableBalance(),
-    ]);
+    // Use batched treasury state (1 multicall instead of 3 eth_calls)
+    const { treasury, buffer, spendable } = await contract.getTreasuryState();
 
     const vol = computeVolatility();
     const status = treasury <= buffer ? "CRITICAL" : "HEALTHY";
