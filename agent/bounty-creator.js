@@ -25,10 +25,12 @@ const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
 
 // ── Tuneable limits ──────────────────────────────────────────────────────────
 
-const MAX_OPEN_BOUNTIES = parseInt(process.env.MAX_OPEN_BOUNTIES || "5", 10);
-const MAX_PER_RUN       = parseInt(process.env.MAX_BOUNTIES_PER_RUN || "2", 10);
-const MIN_BOUNTY_XTZ    = parseFloat(process.env.MIN_BOUNTY_XTZ || "0.5");
-const MAX_BOUNTY_XTZ    = parseFloat(process.env.MAX_BOUNTY_XTZ || "5.0");
+const MAX_OPEN_BOUNTIES    = parseInt(process.env.MAX_OPEN_BOUNTIES || "5", 10);
+const MAX_PER_RUN          = parseInt(process.env.MAX_BOUNTIES_PER_RUN || "2", 10);
+const MIN_BOUNTY_XTZ       = parseFloat(process.env.MIN_BOUNTY_XTZ || "0.5");
+const MAX_BOUNTY_XTZ       = parseFloat(process.env.MAX_BOUNTY_XTZ || "5.0");
+// Fraction of spendable balance to allocate toward new bounties (rest goes to yield)
+const BOUNTY_BUDGET_RATIO  = parseFloat(process.env.BOUNTY_BUDGET_RATIO || "0.3");
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -223,10 +225,13 @@ async function maybeCreateBounties() {
   }
 
   // 3. Determine budget
+  // Only spend BOUNTY_BUDGET_RATIO of spendable — the rest stays for yield investment.
+  // e.g. 4 XTZ spendable × 30% = 1.2 XTZ bounty budget; 2.8 XTZ goes to investSurplus.
   const slotsAvailable = MAX_OPEN_BOUNTIES - openBounties.length;
   const count          = Math.min(slotsAvailable, MAX_PER_RUN);
+  const totalBudget    = spendableXtz * BOUNTY_BUDGET_RATIO;
   const perBountyXtz   = Math.min(
-    Math.floor((spendableXtz / count) * 10) / 10,  // round down to 0.1
+    Math.floor((totalBudget / count) * 10) / 10,  // round down to 0.1 XTZ
     MAX_BOUNTY_XTZ
   );
 
