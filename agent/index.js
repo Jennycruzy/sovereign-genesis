@@ -9,13 +9,14 @@
  */
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
-const { ethers } = require("ethers");
-const contract   = require("./contract");
-const scanner    = require("./scanner");
-const judge      = require("./judge");
-const executor   = require("./executor");
-const financial  = require("./financial");
-const logger     = require("./logger");
+const { ethers }     = require("ethers");
+const contract       = require("./contract");
+const scanner        = require("./scanner");
+const judge          = require("./judge");
+const executor       = require("./executor");
+const financial      = require("./financial");
+const bountyCreator  = require("./bounty-creator");
+const logger         = require("./logger");
 
 // ── Startup validation ────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ async function bootstrap() {
   setInterval(async () => {
     await financial.printHealthReport();
     await financial.maybeInvest();
+    await bountyCreator.maybeCreateBounties();
   }, finInterval);
 
   // ── Real-time fund detection via log polling ──────────────────────────────
@@ -132,10 +134,11 @@ async function bootstrap() {
         );
       }
 
-      // React: invest surplus and re-scan for newly-fundable bounties
+      // React: invest surplus, scan for fundable bounties, create new ones
       await financial.printHealthReport();
       await financial.maybeInvest();
       await scanner.scan();
+      await bountyCreator.maybeCreateBounties();
     } catch (err) {
       logger.error(`Agent: fund-watch error — ${err.message}`);
     }
