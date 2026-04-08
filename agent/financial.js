@@ -7,14 +7,16 @@
  *   2. If "volatility" high           → reduce bounty size
  *   3. If surplus high               → call investSurplus()
  */
-const { ethers }  = require("ethers");
-const contract    = require("./contract");
-const logger      = require("./logger");
+const { ethers } = require("ethers");
+const contract = require("./contract");
+const logger = require("./logger");
 
 // ── Config (tuneable via env) ─────────────────────────────────────────────────
 
 // Fraction of spendable balance beyond which "surplus is high"
-const INVEST_THRESHOLD_RATIO = parseFloat(process.env.INVEST_THRESHOLD_RATIO || "0.5");
+const INVEST_THRESHOLD_RATIO = parseFloat(
+  process.env.INVEST_THRESHOLD_RATIO || "0.5"
+);
 
 // Target investment address (e.g. a liquidity pool on Etherlink)
 const YIELD_TARGET = process.env.YIELD_TARGET_ADDRESS || null;
@@ -45,10 +47,11 @@ function computeVolatility() {
   const mean = diffs.reduce((a, b) => a + b, 0n) / BigInt(diffs.length);
   if (mean === 0n) return 0;
   // Variance
-  const variance = diffs.reduce((acc, d) => {
-    const delta = d - mean;
-    return acc + delta * delta;
-  }, 0n) / BigInt(diffs.length);
+  const variance =
+    diffs.reduce((acc, d) => {
+      const delta = d - mean;
+      return acc + delta * delta;
+    }, 0n) / BigInt(diffs.length);
   // Std dev (integer sqrt approximation)
   const stddev = bigIntSqrt(variance);
   // Return as % of mean
@@ -60,7 +63,10 @@ function bigIntSqrt(n) {
   if (n === 0n) return 0n;
   let x = n;
   let y = (x + 1n) / 2n;
-  while (y < x) { x = y; y = (x + n / x) / 2n; }
+  while (y < x) {
+    x = y;
+    y = (x + n / x) / 2n;
+  }
   return x;
 }
 
@@ -85,7 +91,9 @@ async function adviseBountyAmount(requestedXtz) {
 
   // Rule 1: life support
   if (treasury <= buffer) {
-    logger.warn("Financial: balance below life-support — refusing to post bounty");
+    logger.warn(
+      "Financial: balance below life-support — refusing to post bounty"
+    );
     return null;
   }
 
@@ -99,7 +107,7 @@ async function adviseBountyAmount(requestedXtz) {
     const advisedXtz = ethers.formatEther(advisedWei);
     logger.warn(
       `Financial: high volatility detected — reducing bounty from ` +
-      `${requestedXtz} XTZ to ${advisedXtz} XTZ`
+        `${requestedXtz} XTZ to ${advisedXtz} XTZ`
     );
   }
 
@@ -107,7 +115,7 @@ async function adviseBountyAmount(requestedXtz) {
   if (advisedWei > spendable) {
     logger.warn(
       `Financial: advised bounty (${ethers.formatEther(advisedWei)} XTZ) ` +
-      `exceeds spendable (${ethers.formatEther(spendable)} XTZ) — capping`
+        `exceeds spendable (${ethers.formatEther(spendable)} XTZ) — capping`
     );
     advisedWei = spendable;
   }
@@ -122,7 +130,9 @@ async function adviseBountyAmount(requestedXtz) {
  */
 async function maybeInvest() {
   if (!YIELD_TARGET) {
-    logger.debug("Financial: no YIELD_TARGET_ADDRESS set, skipping investment check");
+    logger.debug(
+      "Financial: no YIELD_TARGET_ADDRESS set, skipping investment check"
+    );
     return;
   }
 
@@ -134,14 +144,12 @@ async function maybeInvest() {
 
   recordBalance(treasury);
 
-  const threshold = BigInt(
-    Math.floor(Number(buffer) * INVEST_THRESHOLD_RATIO)
-  );
+  const threshold = BigInt(Math.floor(Number(buffer) * INVEST_THRESHOLD_RATIO));
 
   if (spendable < threshold) {
     logger.debug(
       `Financial: surplus ${ethers.formatEther(spendable)} XTZ below invest ` +
-      `threshold ${ethers.formatEther(threshold)} XTZ`
+        `threshold ${ethers.formatEther(threshold)} XTZ`
     );
     return;
   }
@@ -154,7 +162,9 @@ async function maybeInvest() {
   try {
     await contract.investSurplus(YIELD_TARGET);
     logger.info(
-      `Financial: invested ${ethers.formatEther(spendable)} XTZ → ${YIELD_TARGET}`
+      `Financial: invested ${ethers.formatEther(
+        spendable
+      )} XTZ → ${YIELD_TARGET}`
     );
   } catch (err) {
     logger.error(`Financial: investSurplus failed — ${err.message}`);
@@ -176,10 +186,10 @@ async function printHealthReport() {
 
     logger.info(
       `[FINANCIAL HEALTH] Status=${status} | ` +
-      `Treasury=${ethers.formatEther(treasury)} XTZ | ` +
-      `Buffer=${ethers.formatEther(buffer)} XTZ | ` +
-      `Spendable=${ethers.formatEther(spendable)} XTZ | ` +
-      `Volatility=${vol.toFixed(1)}%`
+        `Treasury=${ethers.formatEther(treasury)} XTZ | ` +
+        `Buffer=${ethers.formatEther(buffer)} XTZ | ` +
+        `Spendable=${ethers.formatEther(spendable)} XTZ | ` +
+        `Volatility=${vol.toFixed(1)}%`
     );
   } catch (err) {
     logger.error(`Financial health report failed: ${err.message}`);

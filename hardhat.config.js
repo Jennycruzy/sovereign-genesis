@@ -1,9 +1,12 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("dotenv").config();
 
-const ETHERLINK_RPC       = process.env.ETHERLINK_RPC       || "https://node.shadownet.etherlink.com";
-const ETHERLINK_MAINNET   = process.env.ETHERLINK_MAINNET   || "https://node.mainnet.etherlink.com";
-const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "0x" + "0".repeat(64);
+const ETHERLINK_RPC =
+  process.env.ETHERLINK_RPC || "https://node.shadownet.etherlink.com";
+const ETHERLINK_MAINNET =
+  process.env.ETHERLINK_MAINNET || "https://node.mainnet.etherlink.com";
+const DEPLOYER_PRIVATE_KEY =
+  process.env.DEPLOYER_PRIVATE_KEY || "0x" + "0".repeat(64);
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -20,16 +23,16 @@ module.exports = {
 
     // Etherlink Shadownet (testnet — replaced Ghostnet Jan 2026)
     etherlink_testnet: {
-      url:      ETHERLINK_RPC,
+      url: ETHERLINK_RPC,
       accounts: [DEPLOYER_PRIVATE_KEY],
-      chainId:  127823,
+      chainId: 127823,
     },
 
     // Etherlink Mainnet
     etherlink_mainnet: {
-      url:      ETHERLINK_MAINNET,
+      url: ETHERLINK_MAINNET,
       accounts: [DEPLOYER_PRIVATE_KEY],
-      chainId:  42793,
+      chainId: 42793,
     },
   },
 
@@ -44,7 +47,7 @@ module.exports = {
         network: "etherlink_testnet",
         chainId: 128123,
         urls: {
-          apiURL:     "https://testnet.explorer.etherlink.com/api",
+          apiURL: "https://testnet.explorer.etherlink.com/api",
           browserURL: "https://testnet.explorer.etherlink.com",
         },
       },
@@ -52,7 +55,7 @@ module.exports = {
         network: "etherlink_mainnet",
         chainId: 42793,
         urls: {
-          apiURL:     "https://explorer.etherlink.com/api",
+          apiURL: "https://explorer.etherlink.com/api",
           browserURL: "https://explorer.etherlink.com",
         },
       },
@@ -60,9 +63,9 @@ module.exports = {
   },
 
   paths: {
-    sources:   "./contracts",
-    tests:     "./test",
-    cache:     "./cache",
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
     artifacts: "./artifacts",
   },
 };

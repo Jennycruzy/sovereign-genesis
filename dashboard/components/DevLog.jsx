@@ -6,15 +6,18 @@ const EXPLORER = "https://shadownet.explorer.etherlink.com";
 
 export default function DevLog() {
   const [bounties, setBounties] = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [loading, setLoading] = useState(true);
 
   const fetch_ = useCallback(async () => {
     try {
-      const res  = await fetch("/api/bounties", { cache: "no-store" });
+      const res = await fetch("/api/bounties", { cache: "no-store" });
       const json = await res.json();
       setBounties(json.bounties || []);
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -40,7 +43,9 @@ export default function DevLog() {
             {bounties.length} bounties
           </span>
         </div>
-        {loading && <span className="text-xs text-slate-500 animate-pulse">loading…</span>}
+        {loading && (
+          <span className="text-xs text-slate-500 animate-pulse">loading…</span>
+        )}
       </div>
 
       {/* Table */}
@@ -73,7 +78,9 @@ export default function DevLog() {
 
 function BountyRow({ bounty }) {
   const paid = bounty.status === "completed";
-  const hasPaidTo = bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000";
+  const hasPaidTo =
+    bounty.paidTo &&
+    bounty.paidTo !== "0x0000000000000000000000000000000000000000";
 
   return (
     <tr className="hover:bg-slate-900/30 transition-colors">
@@ -87,7 +94,9 @@ function BountyRow({ bounty }) {
         >
           {bounty.title}
         </a>
-        <div className="text-xs text-slate-600 font-mono mt-0.5">#{bounty.id}</div>
+        <div className="text-xs text-slate-600 font-mono mt-0.5">
+          #{bounty.id}
+        </div>
       </td>
 
       {/* Reward */}
