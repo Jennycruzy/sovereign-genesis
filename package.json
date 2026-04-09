@@ -6,6 +6,7 @@
   "scripts": {
     "compile":       "hardhat compile",
     "test":          "hardhat test",
+    "test:agent":    "mocha agent/**/*.test.js --timeout 10000",
     "deploy:testnet": "hardhat run scripts/deploy.js --network etherlink_testnet",
     "deploy:mainnet": "hardhat run scripts/deploy.js --network etherlink_mainnet",
     "agent":         "node agent/index.js",
@@ -24,7 +25,10 @@
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox":     "^5.0.0",
-    "hardhat":                              "^2.22.3"
+    "chai":                                 "^4.4.1",
+    "hardhat":                              "^2.22.3",
+    "mocha":                                "^10.4.0",
+    "nock":                                 "^13.5.4"
   },
   "engines": {
     "node": ">=18.0.0"
