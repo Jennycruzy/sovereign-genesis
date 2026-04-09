@@ -1,0 +1,51 @@
+/* Mobile UX Enhancements for Sovereign-GENESIS Dashboard */
+
+/* Ensure minimum touch target size (44px) for all interactive elements */
+@media (max-width: 640px) {
+  button,
+  a,
+  [role="button"],
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Improve spacing on mobile */
+  main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  /* Make stats strip scrollable horizontally on very small screens */
+  .stats-strip {
+    display: flex;
+    overflow-x: auto;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stats-strip > div {
+    min-width: 140px;
+    flex-shrink: 0;
+  }
+
+  /* Larger text for mobile readability */
+  .text-3xl {
+    font-size: 1.5rem;
+  }
+
+  /* Bounty cards stack vertically */
+  .bounty-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Header improvements */
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+}
