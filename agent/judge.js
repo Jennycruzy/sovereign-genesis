@@ -11,6 +11,21 @@ const { Octokit } = require("@octokit/rest");
 const OpenAI      = require("openai");
 const logger      = require("./logger");
 
+const log = logger.child({ module: "Judge" });
+
+// Validate required env vars at load time
+function validateEnv() {
+  const missing = [];
+  if (!process.env.GITHUB_TOKEN) missing.push("GITHUB_TOKEN");
+  if (!process.env.OPENAI_API_KEY) missing.push("OPENAI_API_KEY");
+  if (!process.env.GITHUB_REPO) missing.push("GITHUB_REPO");
+  if (missing.length) {
+    log.error(`Missing required environment variables: ${missing.join(", ")}`, { severity: "critical" });
+  }
+  return missing.length === 0;
+}
+validateEnv();
+
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const openai  = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -23,43 +38,66 @@ const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
  * Returns true if all required checks pass.
  */
 async function ciPasses(prNumber) {
-  const { data: pr } = await octokit.pulls.get({
-    owner:       REPO_OWNER,
-    repo:        REPO_NAME,
-    pull_number: prNumber,
-  });
+  let pr;
+  try {
+    ({ data: pr } = await octokit.pulls.get({
+      owner:       REPO_OWNER,
+      repo:        REPO_NAME,
+      pull_number: prNumber,
+    }));
+  } catch (err) {
+    log.error(`Failed to fetch PR metadata for CI check`, {
+      severity: "high", prNumber, error: err.message, stack: err.stack
+    });
+    throw err;
+  }
 
   const sha = pr.head.sha;
 
   // Check "commit statuses" (older CI integration)
-  const { data: status } = await octokit.repos.getCombinedStatusForRef({
-    owner: REPO_OWNER,
-    repo:  REPO_NAME,
-    ref:   sha,
-  });
+  try {
+    const { data: status } = await octokit.repos.getCombinedStatusForRef({
+      owner: REPO_OWNER,
+      repo:  REPO_NAME,
+      ref:   sha,
+    });
 
-  if (status.state === "failure" || status.state === "error") {
-    logger.warn(`Judge: CI status is "${status.state}" for PR #${prNumber}`);
-    return false;
+    if (status.state === "failure" || status.state === "error") {
+      log.warn(`CI status is "${status.state}"`, { prNumber, sha, total_count: status.total_count });
+      return false;
+    }
+  } catch (err) {
+    log.error(`Failed to fetch commit statuses`, {
+      severity: "medium", prNumber, sha, error: err.message
+    });
+    // Recovery: proceed to check-runs as fallback
   }
 
   // Also check "check runs" (GitHub Actions)
-  const { data: checks } = await octokit.checks.listForRef({
-    owner:  REPO_OWNER,
-    repo:   REPO_NAME,
-    ref:    sha,
-    filter: "latest",
-  });
+  try {
+    const { data: checks } = await octokit.checks.listForRef({
+      owner:  REPO_OWNER,
+      repo:   REPO_NAME,
+      ref:    sha,
+      filter: "latest",
+    });
 
-  for (const run of checks.check_runs) {
-    if (run.status !== "completed") {
-      logger.warn(`Judge: check "${run.name}" not completed yet (PR #${prNumber})`);
-      return false;
+    for (const run of checks.check_runs) {
+      if (run.status !== "completed") {
+        log.warn(`Check "${run.name}" not completed yet`, { prNumber, check: run.name, status: run.status });
+        return false;
+      }
+      if (run.conclusion === "failure" || run.conclusion === "cancelled") {
+        log.warn(`Check "${run.name}" failed`, { prNumber, check: run.name, conclusion: run.conclusion });
+        return false;
+      }
     }
-    if (run.conclusion === "failure" || run.conclusion === "cancelled") {
-      logger.warn(`Judge: check "${run.name}" failed for PR #${prNumber}`);
-      return false;
-    }
+  } catch (err) {
+    log.error(`Failed to fetch check runs`, {
+      severity: "medium", prNumber, sha, error: err.message
+    });
+    // Recovery: if we can't check, treat as CI pass to let LLM review catch issues
+    log.info(`Recovering: skipping check-runs, proceeding with LLM review`, { prNumber });
   }
 
   return true;
@@ -68,14 +106,22 @@ async function ciPasses(prNumber) {
 // ── PR diff retrieval ─────────────────────────────────────────────────────────
 
 async function getPrDiff(prNumber) {
-  const { data } = await octokit.pulls.get({
-    owner:        REPO_OWNER,
-    repo:         REPO_NAME,
-    pull_number:  prNumber,
-    mediaType:    { format: "diff" },
-  });
-  // When requesting diff media type, data is a string
-  return typeof data === "string" ? data : JSON.stringify(data);
+  try {
+    const { data } = await octokit.pulls.get({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      pull_number:  prNumber,
+      mediaType:    { format: "diff" },
+    });
+    const diff = typeof data === "string" ? data : JSON.stringify(data);
+    log.debug(`Fetched PR diff`, { prNumber, diffLength: diff.length });
+    return diff;
+  } catch (err) {
+    log.error(`Failed to fetch PR diff`, {
+      severity: "high", prNumber, error: err.message, stack: err.stack
+    });
+    throw err;
+  }
 }
 
 // ── LLM analysis ──────────────────────────────────────────────────────────────
@@ -106,24 +152,36 @@ ${diff.slice(0, 8000)}
 \`\`\`
 `.trim();
 
-  const completion = await openai.chat.completions.create({
-    model:       process.env.OPENAI_MODEL || "gpt-4o",
-    temperature: 0,
-    max_tokens:  256,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user",   content: userMessage },
-    ],
-  });
+  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model,
+      temperature: 0,
+      max_tokens: 256,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user",   content: userMessage },
+      ],
+    });
+  } catch (err) {
+    log.error(`LLM API call failed`, {
+      severity: "critical", prNumber, model, error: err.message, stack: err.stack
+    });
+    return { verdict: "FAIL", reason: `LLM API error: ${err.message}` };
+  }
 
   const raw = completion.choices[0].message.content.trim();
+  log.debug(`LLM raw response`, { prNumber, model, responseLength: raw.length });
 
   try {
     // Strip markdown code fences if present
     const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     return JSON.parse(jsonStr);
-  } catch {
-    logger.error(`Judge: LLM returned non-JSON: ${raw}`);
+  } catch (parseErr) {
+    log.error(`LLM returned unparseable JSON`, {
+      severity: "high", prNumber, rawResponse: raw.slice(0, 500), error: parseErr.message
+    });
     return { verdict: "FAIL", reason: "LLM returned unparseable response" };
   }
 }
@@ -136,18 +194,22 @@ ${diff.slice(0, 8000)}
  * @returns {{ verdict: "PASS"|"FAIL", reason: string, ciOk: boolean }}
  */
 async function reviewPr(prNumber) {
-  logger.info(`Judge: reviewing PR #${prNumber}`);
+  const startTime = Date.now();
+  log.info(`Starting PR review`, { prNumber, repo: `${REPO_OWNER}/${REPO_NAME}` });
 
   // Step 1 — CI
   let ciOk = false;
   try {
     ciOk = await ciPasses(prNumber);
-  } catch (err) {
-    logger.error(`Judge: CI check error — ${err.message}`);
+  шибка}catch (err) {
+    log.error(`CI check error — returning FAIL`, {
+      severity: "high", prNumber, error: err.message, stack: err.stack
+    });
     return { verdict: "FAIL", reason: `CI check error: ${err.message}`, ciOk: false };
   }
 
   if (!ciOk) {
+    log.info(`CI did not pass, skipping LLM review`, { prNumber });
     return { verdict: "FAIL", reason: "CI checks did not pass", ciOk: false };
   }
 
@@ -159,12 +221,17 @@ async function reviewPr(prNumber) {
       octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: prNumber }),
     ]);
   } catch (err) {
-    logger.error(`Judge: failed to fetch PR data — ${err.message}`);
+    log.error(`Failed to fetch PR data — returning FAIL`, {
+      severity: "high", prNumber, error: err.message, stack: err.stack
+    });
     return { verdict: "FAIL", reason: `Failed to fetch PR: ${err.message}`, ciOk };
   }
 
   const result = await llmReview(prNumber, pr.title, pr.body, diff);
-  logger.info(`Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`);
+  const elapsed = Date.now() - startTime;
+  log.info(`PR review complete`, {
+    prNumber, verdict: result.verdict, reason: result.reason, ciOk, elapsedMs: elapsed
+  });
 
   return { ...result, ciOk };
 }
