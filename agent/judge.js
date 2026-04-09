@@ -1,112 +1,219 @@
-const logger = require('./logger'); // Import the shared logger
+/**
+ * judge.js — AI Judge System
+ *
+ * Reviews a GitHub PR using:
+ *   1. GitHub CI status check
+ *   2. LLM diff analysis (OpenAI-compatible endpoint)
+ *
+ * Returns: { verdict: "PASS" | "FAIL", reason: string, ciOk: boolean }
+ */
+const { Octokit } = require("@octokit/rest");
+const OpenAI      = require("openai");
+const logger      = require("./logger");
+
+const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
+const openai  = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split("/");
+
+// ── Error logging helpers ─────────────────────────────────────────────────────
 
 /**
- * Initiates the AI review process for a given pull request.
- * Catches and logs any errors encountered during the review with detailed context.
- *
- * @param {object} prDetails - Details of the pull request to be reviewed.
- * @param {string} prDetails.id - The unique identifier of the pull request.
- * @param {string} prDetails.code - The code content of the pull request to be analyzed.
- * @returns {Promise<string>} A promise that resolves to the AI's review decision (e.g., "Approved", "Rejected", "Needs Refinement").
- * @throws {Error} If a critical error occurs during the review process that prevents a decision from being made.
+ * Logs a structured error with full context for easier debugging.
+ * @param {string}    operation - Human-readable name of the operation that failed.
+ * @param {Error}     err       - The caught error object.
+ * @param {object}   [ctx]      - Optional extra key/value context (e.g. prNumber).
  */
-async function judgePR(prDetails) {
-  try {
-    if (!prDetails || !prDetails.id || typeof prDetails.code !== 'string') {
-      const errorMessage = "Invalid or incomplete PR details provided for AI review. Required: id (string), code (string).";
-      logger.error(`[judgePR] ${errorMessage} Received: ${JSON.stringify(prDetails)}`);
-      throw new Error(errorMessage);
-    }
-
-    logger.info(`[judgePR] Starting AI review for PR ID: '${prDetails.id}'`);
-
-    // --- Simulate AI model inference and code analysis ---
-    // In a real application, this would involve calling actual AI models,
-    // external services, or complex local analysis algorithms.
-    const reviewAnalysis = await simulateAIRecognition(prDetails.code);
-
-    // --- Simulate decision making based on the AI analysis ---
-    // This step translates the AI's analysis into a final review decision.
-    const decision = await simulateDecisionMaking(prDetails.id, reviewAnalysis);
-
-    logger.info(`[judgePR] AI review completed for PR ID: '${prDetails.id}'. Decision: '${decision}'`);
-    return decision;
-
-  } catch (error) {
-    // Catch any exceptions that occur during the entire PR review process.
-    // Log the error with high severity and include contextual information for debugging.
-    logger.error(`[judgePR] Failed to complete AI review for PR ID: '${prDetails?.id || 'unknown'}'. Error: ${error.message}`, {
-      context: {
-        prId: prDetails?.id,
-        errorName: error.name,
-        errorMessage: error.message,
-        stack: error.stack,
-        // Potentially add more context here if available, e.g., current phase, input size, etc.
-      }
-    });
-    // Re-throw the error to ensure that any upstream calling function is aware
-    // of the failure and can handle it appropriately.
-    throw error;
-  }
-}
-
-/**
- * [INTERNAL HELPER] Simulates an AI model performing code recognition/analysis.
- * This function is a placeholder and should be replaced with actual AI logic.
- *
- * @param {string} code - The code content to be analyzed.
- * @returns {Promise<object>} A promise that resolves to an object containing analysis results.
- * @throws {Error} If the simulated AI recognition fails.
- */
-async function simulateAIRecognition(code) {
-  // Simulate asynchronous work, like an API call to an AI service.
-  await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
-
-  // Simulate an occasional failure for testing error logging.
-  if (Math.random() < 0.08) { // 8% chance of simulated failure
-    throw new Error("Simulated AI model inference failure: Model endpoint unavailable or input too complex.");
-  }
-
-  // Return mock analysis results.
-  return {
-    linesOfCode: code.split('\n').length,
-    estimatedComplexity: Math.floor(Math.random() * 15) + 1, // 1 to 15
-    criticalIssuesFound: Math.random() < 0.1 ? Math.floor(Math.random() * 3) : 0, // 10% chance of critical issues
-    suggestions: "Consider adding more comments for clarity.",
-    overallScore: Math.random() * 0.5 + 0.5 // Score between 0.5 and 1.0
+function logError(operation, err, ctx = {}) {
+  const entry = {
+    operation,
+    message:   err.message,
+    status:    err.status   ?? err.response?.status ?? undefined,
+    code:      err.code     ?? undefined,
+    timestamp: new Date().toISOString(),
+    context:   ctx,
+    stack:     err.stack,
   };
+  logger.error(`Judge [${operation}] error: ${err.message}`, entry);
 }
 
 /**
- * [INTERNAL HELPER] Simulates the decision-making process based on AI review results.
- * This function is a placeholder and should be replaced with actual decision logic.
- *
- * @param {string} prId - The ID of the pull request.
- * @param {object} analysisResults - The results from the AI code analysis.
- * @returns {Promise<string>} A promise that resolves to the review decision.
- * @throws {Error} If the simulated decision-making process encounters an unresolvable issue.
+ * Logs a structured warning with context.
  */
-async function simulateDecisionMaking(prId, analysisResults) {
-  // Simulate asynchronous work.
-  await new Promise(resolve => setTimeout(resolve, 100));
-
-  if (analysisResults.criticalIssuesFound > 0) {
-    logger.warn(`[judgePR] PR ID: '${prId}' has ${analysisResults.criticalIssuesFound} critical issues. Decision: 'Rejected'`);
-    return "Rejected";
-  }
-
-  if (analysisResults.overallScore < 0.7) {
-    logger.info(`[judgePR] PR ID: '${prId}' has a low overall score (${analysisResults.overallScore.toFixed(2)}). Decision: 'Needs Refinement'`);
-    return "Needs Refinement";
-  }
-
-  if (analysisResults.estimatedComplexity > 10 && Math.random() < 0.05) { // Small chance of failure for high complexity
-    throw new Error(`Simulated decision error: Unhandled high complexity (${analysisResults.estimatedComplexity}) for PR ID: '${prId}'.`);
-  }
-
-  return "Approved";
+function logWarn(operation, message, ctx = {}) {
+  logger.warn(`Judge [${operation}]: ${message}`, { operation, message, context: ctx, timestamp: new Date().toISOString() });
 }
 
-module.exports = {
-  judgePR,
-};
+// ── CI status check ───────────────────────────────────────────────────────────
+
+/**
+ * Fetch the combined CI status for the PR head commit.
+ * Returns true if all required checks pass.
+ */
+async function ciPasses(prNumber) {
+  logger.info(`Judge [ciPasses]: fetching PR #${prNumber} head SHA`);
+
+  const { data: pr } = await octokit.pulls.get({
+    owner:       REPO_OWNER,
+    repo:        REPO_NAME,
+    pull_number: prNumber,
+  });
+
+  const sha = pr.head.sha;
+  logger.info(`Judge [ciPasses]: checking commit statuses for sha=${sha}`);
+
+  // Check "commit statuses" (older CI integration)
+  const { data: status } = await octokit.repos.getCombinedStatusForRef({
+    owner: REPO_OWNER,
+    repo:  REPO_NAME,
+    ref:   sha,
+  });
+
+  if (status.state === "failure" || status.state === "error") {
+    logWarn("ciPasses", `CI combined status is "${status.state}"`, { prNumber, sha });
+    return false;
+  }
+
+  // Also check "check runs" (GitHub Actions)
+  logger.info(`Judge [ciPasses]: checking GitHub Actions check-runs for sha=${sha}`);
+  const { data: checks } = await octokit.checks.listForRef({
+    owner:  REPO_OWNER,
+    repo:   REPO_NAME,
+    ref:    sha,
+    filter: "latest",
+  });
+
+  for (const run of checks.check_runs) {
+    if (run.status !== "completed") {
+      logWarn("ciPasses", `Check "${run.name}" not completed (status=${run.status})`, { prNumber, sha, checkName: run.name });
+      return false;
+    }
+    if (run.conclusion === "failure" || run.conclusion === "cancelled") {
+      logWarn("ciPasses", `Check "${run.name}" conclusion=${run.conclusion}`, { prNumber, sha, checkName: run.name });
+      return false;
+    }
+  }
+
+  logger.info(`Judge [ciPasses]: all CI checks passed for PR #${prNumber}`);
+  return true;
+}
+
+// ── PR diff retrieval ─────────────────────────────────────────────────────────
+
+async function getPrDiff(prNumber) {
+  logger.info(`Judge [getPrDiff]: fetching diff for PR #${prNumber}`);
+  const { data } = await octokit.pulls.get({
+    owner:        REPO_OWNER,
+    repo:         REPO_NAME,
+    pull_number:  prNumber,
+    mediaType:    { format: "diff" },
+  });
+  // When requesting diff media type, data is a string
+  const diff = typeof data === "string" ? data : JSON.stringify(data);
+  logger.info(`Judge [getPrDiff]: received ${diff.length} chars of diff for PR #${prNumber}`);
+  return diff;
+}
+
+// ── LLM analysis ──────────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT = `You are a senior security-aware code reviewer for an autonomous AI treasury agent.
+You must review the provided git diff and return a strict JSON verdict.
+
+Rules:
+- Return ONLY valid JSON: { "verdict": "PASS" | "FAIL", "reason": "..." }
+- FAIL if: hardcoded secrets, API keys, private keys, or passwords are present
+- FAIL if: unit tests are missing or clearly broken
+- FAIL if: reentrancy vulnerabilities exist in Solidity
+- FAIL if: the diff introduces obvious logic errors or backdoors
+- FAIL if: bounty requirements from the PR description are not implemented
+- PASS if: the code looks correct, tests exist, and no security issues are found
+- reason must be a concise single sentence`;
+
+async function llmReview(prNumber, prTitle, prBody, diff) {
+  const model = process.env.OPENAI_MODEL || "gpt-4o";
+  logger.info(`Judge [llmReview]: sending PR #${prNumber} to ${model} (diff=${diff.length} chars)`);
+
+  const userMessage = [
+    `PR #${prNumber}: ${prTitle}`,
+    "",
+    "Description:",
+    prBody || "(none)",
+    "",
+    "Diff (truncated to 8000 chars):",
+    "```diff",
+    diff.slice(0, 8000),
+    "```",
+  ].join("\n");
+
+  const completion = await openai.chat.completions.create({
+    model,
+    temperature: 0,
+    max_tokens:  256,
+    messages: [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user",   content: userMessage },
+    ],
+  });
+
+  const raw = completion.choices[0].message.content.trim();
+  logger.info(`Judge [llmReview]: raw LLM response for PR #${prNumber}: ${raw.slice(0, 200)}`);
+
+  try {
+    // Strip markdown code fences if present
+    const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
+    return JSON.parse(jsonStr);
+  } catch (parseErr) {
+    logError("llmReview:parse", parseErr, { prNumber, raw: raw.slice(0, 200) });
+    return { verdict: "FAIL", reason: "LLM returned unparseable response" };
+  }
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Full review pipeline for a PR.
+ * @param {number} prNumber
+ * @returns {{ verdict: "PASS"|"FAIL", reason: string, ciOk: boolean }}
+ */
+async function reviewPr(prNumber) {
+  logger.info(`Judge [reviewPr]: starting review for PR #${prNumber}`);
+
+  // Step 1 — CI
+  let ciOk = false;
+  try {
+    ciOk = await ciPasses(prNumber);
+  } catch (err) {
+    logError("ciPasses", err, { prNumber });
+    return { verdict: "FAIL", reason: `CI check error: ${err.message}`, ciOk: false };
+  }
+
+  if (!ciOk) {
+    logger.info(`Judge [reviewPr]: CI did not pass for PR #${prNumber} — short-circuiting`);
+    return { verdict: "FAIL", reason: "CI checks did not pass", ciOk: false };
+  }
+
+  // Step 2 — LLM diff review
+  let diff, pr;
+  try {
+    [diff, { data: pr }] = await Promise.all([
+      getPrDiff(prNumber),
+      octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: prNumber }),
+    ]);
+  } catch (err) {
+    logError("getPrData", err, { prNumber });
+    return { verdict: "FAIL", reason: `Failed to fetch PR data: ${err.message}`, ciOk };
+  }
+
+  let result;
+  try {
+    result = await llmReview(prNumber, pr.title, pr.body, diff);
+  } catch (err) {
+    logError("llmReview", err, { prNumber, model: process.env.OPENAI_MODEL || "gpt-4o" });
+    return { verdict: "FAIL", reason: `LLM review error: ${err.message}`, ciOk };
+  }
+
+  logger.info(`Judge [reviewPr]: PR #${prNumber} final verdict=${result.verdict} — ${result.reason}`);
+  return { ...result, ciOk };
+}
+
+module.exports = { reviewPr };
