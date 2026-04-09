@@ -368,7 +368,8 @@ Netlify will auto-deploy on every push to your main branch. The first deploy tri
 > **Note:** The agent and webhook server cannot run on Netlify (they are long-running Node.js processes). For full autonomous operation, run those on a VPS or server separately. The Netlify deployment hosts only the dashboard UI.
 
 ---
-
+## Team Info ##
+This is a solo project. Built and deployed by x.com/jennycruzy
 ## License
 
 MIT
