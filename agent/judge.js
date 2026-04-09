@@ -87,14 +87,28 @@ async function ciPasses(prNumber) {
 // ── PR diff retrieval ─────────────────────────────────────────────────────────
 
 async function getPrDiff(prNumber) {
-  const { data } = await octokit.pulls.get({
-    owner:        REPO_OWNER,
-    repo:         REPO_NAME,
-    pull_number:  prNumber,
-    mediaType:    { format: "diff" },
-  });
+  let data;
+  try {
+    const response = await octokit.pulls.get({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      pull_number:  prNumber,
+      mediaType:    { format: "diff" },
+    });
+    data = response.data;
+  } catch (err) {
+    logger.error(`Judge: failed to fetch diff for PR #${prNumber} — ${err.message} (status: ${err.status})`);
+    throw err;
+  }
+  if (data === undefined || data === null) {
+    const msg = `Judge: empty response from GitHub API for PR #${prNumber} diff`;
+    logger.error(msg);
+    throw new Error(msg);
+  }
   // When requesting diff media type, data is a string
-  return typeof data === "string" ? data : JSON.stringify(data);
+  const diff = typeof data === "string" ? data : JSON.stringify(data);
+  logger.info(`Judge: fetched diff for PR #${prNumber} (${diff.length} chars)`);
+  return diff;
 }
 
 // ── LLM analysis ──────────────────────────────────────────────────────────────
@@ -147,9 +161,9 @@ ${diff.slice(0, 8000)}
     // Strip markdown code fences if present
     const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     return JSON.parse(jsonStr);
-  } catch {
-    logger.error(`Judge: LLM returned non-JSON for PR #${prNumber}: ${raw}`);
-    return { verdict: "FAIL", reason: "LLM returned unparseable response" };
+  } catch (parseErr) {
+    logger.error(`Judge: LLM returned non-JSON for PR #${prNumber} (parse error: ${parseErr.message}) — raw response: ${raw.slice(0, 200)}`);
+    return { verdict: "FAIL", reason: `LLM returned unparseable response: ${parseErr.message}` };
   }
 }
 
@@ -210,3 +224,14 @@ async function reviewPr(prNumber) {
 }
 
 module.exports = { reviewPr };
+
+// ── Unhandled exception / rejection guards ────────────────────────────────────
+process.on("uncaughtException", (err) => {
+  logger.error(`Judge: uncaughtException — ${err.message}\n${err.stack}`);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  const reasonStr = reason instanceof Error ? `${reason.message}\n${reason.stack}` : String(reason);
+  logger.error(`Judge: unhandledRejection at promise ${promise} — ${reasonStr}`);
+});
