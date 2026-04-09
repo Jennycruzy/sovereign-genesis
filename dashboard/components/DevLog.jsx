@@ -29,11 +29,11 @@ export default function DevLog() {
   );
 
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur h-full">
+    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 backdrop-blur h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
+      <div className="flex items-center justify-between mb-4 sm:mb-5">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <h2 className="text-base sm:text-lg font-bold tracking-widest uppercase text-sovereign-300">
             Development Log
           </h2>
           <span className="text-xs bg-sovereign-900/50 text-sovereign-400 border border-sovereign-700/40 px-2 py-0.5 rounded">
@@ -43,29 +43,36 @@ export default function DevLog() {
         {loading && <span className="text-xs text-slate-500 animate-pulse">loading…</span>}
       </div>
 
-      {/* Table */}
+      {/* Table - hidden on mobile, shown on sm+ */}
       {sorted.length === 0 && !loading ? (
         <div className="text-center text-slate-600 text-sm py-6">
           No bounties yet.
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-600 uppercase tracking-widest border-b border-slate-800">
-                <th className="pb-2 pr-4">Bounty</th>
-                <th className="pb-2 pr-4">Reward</th>
-                <th className="pb-2 pr-4">Contributor</th>
-                <th className="pb-2">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {sorted.map((b) => (
-                <BountyRow key={b.id} bounty={b} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-600 uppercase tracking-widest border-b border-slate-800">
+                  <th className="pb-2 pr-4">Bounty</th>
+                  <th className="pb-2 pr-4">Reward</th>
+                  <th className="pb-2 pr-4">Contributor</th>
+                  <th className="pb-2">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {sorted.map((b) => (
+                  <BountyRow key={b.id} bounty={b} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="sm:hidden space-y-3">
+            {sorted.map((b) => (
+              <MobileBountyCard key={b.id} bounty={b} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
@@ -154,5 +161,42 @@ function BountyRow({ bounty }) {
         )}
       </td>
     </tr>
+  );
+}
+
+function MobileBountyCard({ bounty }) {
+  const paid = bounty.status === "completed";
+  const hasPaidTo = bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000";
+
+  return (
+    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-3 space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <a
+          href={bounty.issueUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-sovereign-400 hover:text-sovereign-300 font-semibold line-clamp-1 transition-colors flex-1 min-w-0"
+        >
+          {bounty.title}
+        </a>
+        <span className="text-xs text-neon-blue font-bold font-mono">{bounty.reward}</span>
+      </div>
+      <div className="flex items-center justify-between text-xs">
+        {hasPaidTo ? (
+          <span className="text-emerald-400 font-mono truncate max-w-[160px]">{bounty.paidTo}</span>
+        ) : (
+          <span className="text-slate-600">open</span>
+        )}
+        {paid ? (
+          <span className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-900/30 border border-emerald-700/40 px-2 py-0.5 rounded">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> PAID
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-900/30 border border-amber-700/40 px-2 py-0.5 rounded">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" /> OPEN
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

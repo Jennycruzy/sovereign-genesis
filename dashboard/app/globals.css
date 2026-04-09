@@ -13,6 +13,30 @@
   box-sizing: border-box;
 }
 
+/* Prevent horizontal overflow on mobile */
+html, body {
+  max-width: 100vw;
+}
+
+@media (max-width: 640px) {
+  .card-glow {
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.2),
+                0 2px 12px rgba(139, 92, 246, 0.1);
+  }
+  
+  .card-glow:hover {
+    box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.4),
+                0 2px 16px rgba(139, 92, 246, 0.2);
+  }
+
+  .text-neon-purple,
+  .text-neon-blue,
+  .text-neon-green,
+  .text-neon-red {
+    text-shadow: none;
+  }
+}
+
 /* Dark mode (default) */
 body {
   background-color: #050509;
