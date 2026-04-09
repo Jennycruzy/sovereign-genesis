@@ -369,7 +369,7 @@ Netlify will auto-deploy on every push to your main branch. The first deploy tri
 
 ---
 ## Team Info ##
-This is a solo project. Built and deployed by x.com/jennycruzy
+This is a solo project. Built and deployed by https://x.com/jennycruzy
 ## License
 
 MIT
