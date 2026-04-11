@@ -21,61 +21,93 @@ const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split(
 /**
  * Fetch the combined CI status for the PR head commit.
  * Returns true if all required checks pass.
+ * All errors are caught and logged with full context.
  */
 async function ciPasses(prNumber) {
-  const { data: pr } = await octokit.pulls.get({
-    owner:       REPO_OWNER,
-    repo:        REPO_NAME,
-    pull_number: prNumber,
-  });
-
-  const sha = pr.head.sha;
+  let sha;
+  try {
+    const { data: pr } = await octokit.pulls.get({
+      owner:       REPO_OWNER,
+      repo:        REPO_NAME,
+      pull_number: prNumber,
+    });
+    sha = pr.head.sha;
+    logger.info(`Judge: fetched PR #${prNumber}, head SHA: ${sha}`);
+  } catch (err) {
+    logger.error(`Judge: failed to fetch PR #${prNumber} details — ${err.message} (${err.status})`);
+    throw err;
+  }
 
   // Check "commit statuses" (older CI integration)
-  const { data: status } = await octokit.repos.getCombinedStatusForRef({
-    owner: REPO_OWNER,
-    repo:  REPO_NAME,
-    ref:   sha,
-  });
+  let status;
+  try {
+    const { data } = await octokit.repos.getCombinedStatusForRef({
+      owner: REPO_OWNER,
+      repo:  REPO_NAME,
+      ref:   sha,
+    });
+    status = data;
+    logger.info(`Judge: combined status for SHA ${sha}: "${status.state}" (${status.total_count} checks)`);
+  } catch (err) {
+    logger.error(`Judge: failed to get combined status for SHA ${sha} — ${err.message} (${err.status})`);
+    throw err;
+  }
 
   if (status.state === "failure" || status.state === "error") {
-    logger.warn(`Judge: CI status is "${status.state}" for PR #${prNumber}`);
+    logger.warn(`Judge: CI status is "${status.state}" for PR #${prNumber} (SHA: ${sha})`);
     return false;
   }
 
   // Also check "check runs" (GitHub Actions)
-  const { data: checks } = await octokit.checks.listForRef({
-    owner:  REPO_OWNER,
-    repo:   REPO_NAME,
-    ref:    sha,
-    filter: "latest",
-  });
+  let checks;
+  try {
+    const { data } = await octokit.checks.listForRef({
+      owner:  REPO_OWNER,
+      repo:   REPO_NAME,
+      ref:    sha,
+      filter: "latest",
+    });
+    checks = data;
+    logger.info(`Judge: fetched ${checks.check_runs.length} check runs for PR #${prNumber}`);
+  } catch (err) {
+    logger.error(`Judge: failed to list check runs for SHA ${sha} — ${err.message} (${err.status})`);
+    throw err;
+  }
 
   for (const run of checks.check_runs) {
     if (run.status !== "completed") {
-      logger.warn(`Judge: check "${run.name}" not completed yet (PR #${prNumber})`);
+      logger.warn(`Judge: check "${run.name}" (id: ${run.id}) not completed yet for PR #${prNumber}`);
       return false;
     }
     if (run.conclusion === "failure" || run.conclusion === "cancelled") {
-      logger.warn(`Judge: check "${run.name}" failed for PR #${prNumber}`);
+      logger.warn(`Judge: check "${run.name}" (id: ${run.id}) concluded "${run.conclusion}" for PR #${prNumber}`);
       return false;
     }
   }
 
+  logger.info(`Judge: all CI checks passed for PR #${prNumber}`);
   return true;
 }
 
 // ── PR diff retrieval ─────────────────────────────────────────────────────────
 
 async function getPrDiff(prNumber) {
-  const { data } = await octokit.pulls.get({
-    owner:        REPO_OWNER,
-    repo:         REPO_NAME,
-    pull_number:  prNumber,
-    mediaType:    { format: "diff" },
-  });
-  // When requesting diff media type, data is a string
-  return typeof data === "string" ? data : JSON.stringify(data);
+  let diff;
+  try {
+    const { data } = await octokit.pulls.get({
+      owner:        REPO_OWNER,
+      repo:         REPO_NAME,
+      pull_number:  prNumber,
+      mediaType:    { format: "diff" },
+    });
+    // When requesting diff media type, data is a string
+    diff = typeof data === "string" ? data : JSON.stringify(data);
+    logger.info(`Judge: fetched diff for PR #${prNumber} (${diff.length} chars)`);
+    return diff;
+  } catch (err) {
+    logger.error(`Judge: failed to fetch diff for PR #${prNumber} — ${err.message} (${err.status})`);
+    throw err;
+  }
 }
 
 // ── LLM analysis ──────────────────────────────────────────────────────────────
@@ -106,15 +138,23 @@ ${diff.slice(0, 8000)}
 \`\`\`
 `.trim();
 
-  const completion = await openai.chat.completions.create({
-    model:       process.env.OPENAI_MODEL || "gpt-4o",
-    temperature: 0,
-    max_tokens:  256,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user",   content: userMessage },
-    ],
-  });
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model:       process.env.OPENAI_MODEL || "gpt-4o",
+      temperature: 0,
+      max_tokens:  256,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user",   content: userMessage },
+      ],
+    });
+    logger.info(`Judge: LLM responded for PR #${prNumber}, model: ${process.env.OPENAI_MODEL || "gpt-4o"}`);
+  } catch (err) {
+    const detail = err?.response?.data ? JSON.stringify(err.response.data) : err.message;
+    logger.error(`Judge: LLM API call failed for PR #${prNumber} — ${detail}`);
+    return { verdict: "FAIL", reason: `LLM API error: ${err.message}` };
+  }
 
   const raw = completion.choices[0].message.content.trim();
 
@@ -122,8 +162,8 @@ ${diff.slice(0, 8000)}
     // Strip markdown code fences if present
     const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     return JSON.parse(jsonStr);
-  } catch {
-    logger.error(`Judge: LLM returned non-JSON: ${raw}`);
+  } catch (parseErr) {
+    logger.error(`Judge: LLM returned non-JSON for PR #${prNumber}: "${raw.slice(0, 200)}"`);
     return { verdict: "FAIL", reason: "LLM returned unparseable response" };
   }
 }
