@@ -93,8 +93,10 @@ contract SovereignAgent is ReentrancyGuard {
         require(bounties[githubPrId] == 0, "SovereignAgent: bounty already posted");
         require(!bountyPaid[githubPrId], "SovereignAgent: bounty already paid");
 
-        uint256 available = _spendableBalance();
-        require(available >= amount, "SovereignAgent: insufficient spendable balance");
+        // Cache reserved to save gas
+        uint256 reserved = lifeSupportBuffer + totalEscrowed;
+        uint256 bal = address(this).balance;
+        require(bal >= reserved + amount, "SovereignAgent: insufficient spendable balance");
 
         // Effects
         bounties[githubPrId] = amount;
