@@ -6,11 +6,12 @@
  *  - Deployment data is cached after first load (no repeated fs I/O).
  *  - Read-only calls (treasuryBalance, spendableBalance, etc.) are batched
  *    via Multicall3 so a single eth_call handles N reads instead of N round-trips.
- *    The Multicall3 Contract instance itself is also cached (no repeated object
- *    allocation on every treasury snapshot call).
- *  - Write transactions estimate gas upfront, apply a configurable buffer,
- *    and set explicit maxFeePerGas/maxPriorityFeePerGas (EIP-1559) to avoid
- *    accidentally paying legacy-market premiums on Etherlink.
+ *    The Multicall3 Contract instance and SovereignAgent Interface are both cached
+ *    so repeated treasury snapshots do not re-parse ABI or re-allocate objects.
+ *  - Write transactions use estimateGas (returns only the gas number, no EVM
+ *    state writes) instead of the heavier callStatic pattern (full tx simulation)
+ *    before every on-chain write — eliminating one redundant EVM execution per tx.
+ *    A configurable buffer is applied on top and EIP-1559 fee settings are used.
  *  - Write transactions retry with exponential back-off on transient failures.
  */
 const { ethers } = require("ethers");
@@ -32,6 +33,10 @@ let _deploymentCache = null;
 // object and re-building the ABI interface on every getTreasurySnapshot call).
 let _mc3 = null;
 let _mc3Iface = null;
+
+// Cached Interface for the SovereignAgent contract (avoids re-parsing the ABI
+// on every getTreasurySnapshot() call).
+let _contractIface = null;
 
 /**
  * Load and cache the deployment JSON.  Cache is invalidated when
@@ -167,18 +172,24 @@ async function _txWithRetry(fn, maxRetries = 3) {
  *
  * The Multicall3 Contract instance is lazily cached in _mc3 so repeated
  * calls to getTreasurySnapshot() do not allocate new Contract objects.
+ * The SovereignAgent Interface is also cached in _contractIface so the ABI
+ * is not re-parsed on every call.
  *
  * @returns {{ treasuryBalance, spendableBalance, lifeSupportBuffer }}
  */
 async function getTreasurySnapshot() {
   const deployment = loadDeployment();
   const mc3        = _getMc3();
-  const iface      = new ethers.Interface(deployment.abi);
+
+  // Cache the Interface so ABI is not re-parsed on every snapshot call
+  if (!_contractIface) {
+    _contractIface = new ethers.Interface(deployment.abi);
+  }
 
   const readCalls = [
-    { target: _contractAddress, allowFailure: false, callData: iface.encodeFunctionData("treasuryBalance")    },
-    { target: _contractAddress, allowFailure: false, callData: iface.encodeFunctionData("spendableBalance")   },
-    { target: _contractAddress, allowFailure: false, callData: iface.encodeFunctionData("lifeSupportBuffer")  },
+    { target: _contractAddress, allowFailure: false, callData: _contractIface.encodeFunctionData("treasuryBalance")    },
+    { target: _contractAddress, allowFailure: false, callData: _contractIface.encodeFunctionData("spendableBalance")   },
+    { target: _contractAddress, allowFailure: false, callData: _contractIface.encodeFunctionData("lifeSupportBuffer")  },
   ];
 
   try {
@@ -235,18 +246,21 @@ async function getBountyAmount(prId) {
 
 /**
  * Shared gas override builder for write helpers.
- * Uses the call-version of the transaction (via .call()) to estimate gas
- * without actually sending, adds a buffer, and returns an Overrides object
- * with explicit gasLimit set. Falls back to an empty overrides object on
- * estimation failure so the transaction still proceeds with ethers' default.
+ * Uses estimateGas (lightweight — returns only the gas number, no EVM state
+ * writes) instead of callStatic (full tx simulation) to avoid paying for
+ * redundant EVM execution on every transaction.
  *
- * @param {object} callObj  - ethers v5 call object (result of contract.method(...))
- * @param {object} sendObj  - ethers v5 send object (result of contract.method(...))
+ * Adds a configurable buffer on top of the raw estimate and returns an
+ * Overrides object with explicit gasLimit set. Falls back to an empty
+ * overrides object on estimation failure so the transaction still proceeds
+ * with ethers' default.
+ *
+ * @param {Function} estimateFn  - async function that calls contract.estimateGas.method(args)
  * @returns {object} ethers Overrides { gasLimit } or {}
  */
-async function _buildGasOverride(callObj, sendObj) {
+async function _buildGasOverride(estimateFn) {
   try {
-    const raw     = await callObj.estimate();
+    const raw     = await estimateFn();
     const bps     = parseInt(process.env.GAS_BUFFER_BPS || DEFAULT_GAS_BUFFER_BPS, 10);
     const buffer  = raw.mul(bps).div(10000);
     const gasLimit = raw.add(buffer);
@@ -262,9 +276,8 @@ async function postBounty(prId, amountXtz) {
   const amount = ethers.parseEther(String(amountXtz));
   logger.info(`postBounty(${prId}, ${amountXtz} XTZ)`);
   return _txWithRetry(async () => {
-    const overrides = await _buildGasOverride(
-      _contract.callStatic.postBounty(prId, amount),
-      _contract.postBounty(prId, amount)
+    const overrides = await _buildGasOverride(() =>
+      _contract.estimateGas.postBounty(prId, amount)
     );
     const tx = await _contract.postBounty(prId, amount, overrides);
     logger.info(`postBounty submitted: ${tx.hash}`);
@@ -275,9 +288,8 @@ async function postBounty(prId, amountXtz) {
 async function releaseBounty(prId, contributorAddress) {
   logger.info(`releaseBounty(${prId} → ${contributorAddress})`);
   return _txWithRetry(async () => {
-    const overrides = await _buildGasOverride(
-      _contract.callStatic.releaseBounty(prId, contributorAddress),
-      _contract.releaseBounty(prId, contributorAddress)
+    const overrides = await _buildGasOverride(() =>
+      _contract.estimateGas.releaseBounty(prId, contributorAddress)
     );
     const tx = await _contract.releaseBounty(prId, contributorAddress, overrides);
     logger.info(`releaseBounty submitted: ${tx.hash}`);
@@ -288,9 +300,8 @@ async function releaseBounty(prId, contributorAddress) {
 async function investSurplus(targetAddress) {
   logger.info(`investSurplus(→ ${targetAddress})`);
   return _txWithRetry(async () => {
-    const overrides = await _buildGasOverride(
-      _contract.callStatic.investSurplus(targetAddress),
-      _contract.investSurplus(targetAddress)
+    const overrides = await _buildGasOverride(() =>
+      _contract.estimateGas.investSurplus(targetAddress)
     );
     const tx = await _contract.investSurplus(targetAddress, overrides);
     logger.info(`investSurplus submitted: ${tx.hash}`);
@@ -301,9 +312,8 @@ async function investSurplus(targetAddress) {
 async function setLifeSupportBuffer(amountXtz) {
   const amount = ethers.parseEther(String(amountXtz));
   return _txWithRetry(async () => {
-    const overrides = await _buildGasOverride(
-      _contract.callStatic.setLifeSupportBuffer(amount),
-      _contract.setLifeSupportBuffer(amount)
+    const overrides = await _buildGasOverride(() =>
+      _contract.estimateGas.setLifeSupportBuffer(amount)
     );
     const tx = await _contract.setLifeSupportBuffer(amount, overrides);
     logger.info(`setLifeSupportBuffer submitted: ${tx.hash}`);
