@@ -74,15 +74,24 @@ async function ciPasses(prNumber) {
     throw err;
   }
 
-  for (const run of checks.check_runs) {
-    if (run.status !== "completed") {
-      logger.warn(`Judge: check "${run.name}" (id: ${run.id}) not completed yet for PR #${prNumber}`);
-      return false;
+  try {
+    for (const run of checks.check_runs) {
+      if (run.status !== "completed") {
+        logger.warn(`Judge: check "${run.name}" (id: ${run.id}) not completed yet for PR #${prNumber}`);
+        return false;
+      }
+      if (run.conclusion === "failure" || run.conclusion === "cancelled") {
+        logger.warn(`Judge: check "${run.name}" (id: ${run.id}) concluded "${run.conclusion}" for PR #${prNumber}`);
+        return false;
+      }
     }
-    if (run.conclusion === "failure" || run.conclusion === "cancelled") {
-      logger.warn(`Judge: check "${run.name}" (id: ${run.id}) concluded "${run.conclusion}" for PR #${prNumber}`);
-      return false;
-    }
+  } catch (err) {
+    logger.error(`Judge: failed to iterate check runs for PR #${prNumber} — ${err.message}`, {
+      stack: err.stack,
+      sha,
+      checkRunsCount: checks.check_runs.length,
+    });
+    throw err;
   }
 
   logger.info(`Judge: all CI checks passed for PR #${prNumber}`);
@@ -156,6 +165,11 @@ ${diff.slice(0, 8000)}
     return { verdict: "FAIL", reason: `LLM API error: ${err.message}` };
   }
 
+  if (!completion.choices || completion.choices.length === 0) {
+    logger.error(`Judge: LLM returned empty choices for PR #${prNumber}`);
+    return { verdict: "FAIL", reason: "LLM returned no choices" };
+  }
+
   const raw = completion.choices[0].message.content.trim();
 
   try {
@@ -163,7 +177,9 @@ ${diff.slice(0, 8000)}
     const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
     return JSON.parse(jsonStr);
   } catch (parseErr) {
-    logger.error(`Judge: LLM returned non-JSON for PR #${prNumber}: "${raw.slice(0, 200)}"`);
+    logger.error(`Judge: LLM returned non-JSON for PR #${prNumber}: "${raw.slice(0, 200)}"`, {
+      stack: parseErr.stack,
+    });
     return { verdict: "FAIL", reason: "LLM returned unparseable response" };
   }
 }
@@ -203,7 +219,17 @@ async function reviewPr(prNumber) {
     return { verdict: "FAIL", reason: `Failed to fetch PR: ${err.message}`, ciOk };
   }
 
-  const result = await llmReview(prNumber, pr.title, pr.body, diff);
+  let result;
+  try {
+    result = await llmReview(prNumber, pr.title, pr.body, diff);
+  } catch (err) {
+    logger.error(`Judge: llmReview threw unhandled error for PR #${prNumber} — ${err.message}`, {
+      stack: err.stack,
+      prTitle: pr.title,
+      diffLength: diff.length,
+    });
+    return { verdict: "FAIL", reason: `LLM review threw: ${err.message}`, ciOk };
+  }
   logger.info(`Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`);
 
   return { ...result, ciOk };
