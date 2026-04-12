@@ -12,6 +12,7 @@ const STATUS_STYLE = {
 export default function OpenBounties() {
   const [bounties, setBounties] = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [showGuide, setShowGuide] = useState(false);
 
   const fetch_ = useCallback(async () => {
     try {
@@ -33,12 +34,13 @@ export default function OpenBounties() {
   const noPayout = bounties.filter((b) => b.status === "no_payout");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Section header */}
-      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
+      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 backdrop-blur">
+        {/* Header row — stacks on mobile */}
+        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 mb-4 sm:mb-5">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h2 className="text-base sm:text-lg font-bold tracking-widest uppercase text-sovereign-300">
               Open Bounties
             </h2>
             <span className="text-xs bg-sovereign-900/50 text-sovereign-400 border border-sovereign-700/40 px-2 py-0.5 rounded">
@@ -55,18 +57,28 @@ export default function OpenBounties() {
               </span>
             )}
           </div>
-          {loading && <span className="text-xs text-slate-500 animate-pulse">loading…</span>}
+          <div className="flex items-center gap-2">
+            {loading && <span className="text-xs text-slate-500 animate-pulse">loading…</span>}
+            {/* Guide toggle — mobile only */}
+            <button
+              onClick={() => setShowGuide((v) => !v)}
+              className="xs:hidden text-xs text-sovereign-400 hover:text-sovereign-300 border border-sovereign-700/50 px-2 py-1 rounded transition-colors"
+              aria-expanded={showGuide}
+            >
+              {showGuide ? "Hide guide" : "How to contribute"}
+            </button>
+          </div>
         </div>
 
-        {/* How to submit */}
-        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 mb-6">
+        {/* How to submit — always visible on sm+, collapsible on mobile */}
+        <div className={`rounded-lg border border-slate-700/50 bg-slate-900/50 p-3 sm:p-4 mb-4 sm:mb-6 ${showGuide ? "block" : "hidden xs:block"}`}>
           <h3 className="text-sm font-bold text-slate-300 mb-2">How to Contribute</h3>
           <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
             <li>Fork the repository and complete the bounty task</li>
             <li>Open a Pull Request against the main branch</li>
-            <li>
+            <li className="flex flex-wrap items-center gap-1">
               Include your payout wallet in the PR description:
-              <code className="ml-1 bg-slate-800 text-tezos-400 px-1.5 py-0.5 rounded text-xs">
+              <code className="bg-slate-800 text-tezos-400 px-1.5 py-0.5 rounded text-xs whitespace-nowrap">
                 Wallet: 0xYourAddress
               </code>
             </li>
@@ -81,7 +93,7 @@ export default function OpenBounties() {
             No bounties posted yet. Watch this space.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {bounties.map((b) => (
               <BountyCard key={b.id} bounty={b} />
             ))}
@@ -96,35 +108,39 @@ function BountyCard({ bounty }) {
   const s = STATUS_STYLE[bounty.status] || STATUS_STYLE.open;
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
+    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-3 sm:p-5 flex flex-col gap-2 sm:gap-3 hover:border-sovereign-700/50 transition-colors">
       {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-slate-200 leading-snug">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-200 leading-snug line-clamp-2">
             {bounty.title}
           </h3>
           <span className="text-xs text-slate-600 mt-0.5">#{bounty.id}</span>
         </div>
-        <span className={`shrink-0 flex items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}>
+        <span className={`shrink-0 flex items-center gap-1 text-[10px] sm:text-xs ${s.color} ${s.bg} border px-1.5 sm:px-2 py-0.5 rounded`}>
           <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-          {s.badge}
+          <span className="hidden sm:inline">{s.badge}</span>
         </span>
       </div>
 
       {/* Description */}
-      <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
+      <p className="text-xs text-slate-400 leading-relaxed line-clamp-2 sm:line-clamp-3">
         {bounty.description}
       </p>
 
       {/* Reward */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-slate-600 uppercase tracking-wider">Reward:</span>
+<<<<<<< Updated upstream
         <span className="text-sm font-bold font-mono text-neon-blue">{bounty.reward}</span>
         {bounty.volatilityNote && (
           <span className="text-xs text-amber-500 bg-amber-900/20 border border-amber-700/30 px-1.5 py-0.5 rounded">
             ⚡ volatility adjusted
           </span>
         )}
+=======
+        <span className="text-sm font-bold font-mono text-neon-blue truncate">{bounty.reward}</span>
+>>>>>>> Stashed changes
       </div>
 
       {/* Volatility explanation */}
@@ -146,16 +162,16 @@ function BountyCard({ bounty }) {
       {/* Paid to (if completed) */}
       {bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000" && (
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-600 uppercase tracking-wider">Paid to:</span>
-            <span className="text-xs font-mono text-emerald-400 truncate">{bounty.paidTo}</span>
+            <span className="text-xs font-mono text-emerald-400 truncate max-w-[140px] sm:max-w-[200px]">{bounty.paidTo}</span>
           </div>
           {bounty.txHash && (
             <a
               href={`https://shadownet.explorer.etherlink.com/tx/${bounty.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate ml-[calc(theme(spacing.2)+3.5rem)] -mt-0.5"
+              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate"
             >
               verify tx →
             </a>
@@ -163,25 +179,29 @@ function BountyCard({ bounty }) {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
+      {/* Actions — always stacked on mobile */}
+      <div className="flex flex-col xs:flex-row gap-1.5 mt-auto pt-2 border-t border-slate-800/50">
         <a
           href={bounty.repoUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 text-center text-xs px-3 py-2 rounded-lg border border-sovereign-700 bg-sovereign-900/30 text-sovereign-300 hover:bg-sovereign-800/40 transition-colors"
+          className="flex-1 text-center text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-sovereign-700 bg-sovereign-900/30 text-sovereign-300 hover:bg-sovereign-800/40 transition-colors whitespace-nowrap"
         >
+<<<<<<< Updated upstream
           {bounty.status === "completed"
             ? "View Repo"
             : bounty.status === "no_payout"
             ? "View Repo"
             : "Submit via GitHub PR"}
+=======
+          {bounty.status === "completed" ? "View Repo" : "Submit PR"}
+>>>>>>> Stashed changes
         </a>
         <a
           href={bounty.issueUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs px-3 py-2 rounded-lg border border-slate-700 bg-slate-900/30 text-slate-400 hover:text-slate-300 transition-colors"
+          className="text-center text-xs px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg border border-slate-700 bg-slate-900/30 text-slate-400 hover:text-slate-300 transition-colors whitespace-nowrap"
         >
           Issue →
         </a>
