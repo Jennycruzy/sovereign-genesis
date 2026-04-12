@@ -44,7 +44,7 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col">
       <Header lastUpdated={lastPoll} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-6 sm:py-8 space-y-4 sm:space-y-6">
 
         {/* Error banner */}
         {error && (
@@ -72,16 +72,16 @@ export default function DashboardPage() {
         <OpenBounties />
 
         {/* Row 3 — Feed + Dev Log side by side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <TreasuryFeed events={data?.events || []} isLoading={loading} />
           <DevLog />
         </div>
 
-        {/* Row 3 — System stats strip */}
+        {/* Row 4 — System stats strip */}
         <StatsStrip data={data} />
       </main>
 
-      <footer className="border-t border-slate-900 px-6 py-3 text-center text-xs text-slate-700">
+      <footer className="border-t border-slate-900 px-4 py-3 text-center text-xs text-slate-700">
         SOVEREIGN-GENESIS · Autonomous AI · Tezos Etherlink EVM · Poll every {POLL_INTERVAL / 1000}s
       </footer>
     </div>
@@ -105,14 +105,14 @@ function StatsStrip({ data }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
       {stats.map((s) => (
         <div
           key={s.label}
-          className="rounded-lg border border-slate-800/60 bg-slate-900/50 p-4 text-center"
+          className="rounded-lg border border-slate-800/60 bg-slate-900/50 p-3 sm:p-4 text-center overflow-hidden"
         >
-          <div className={`text-3xl font-bold font-mono ${s.color}`}>{s.value}</div>
-          <div className="text-xs text-slate-600 uppercase tracking-widest mt-1">{s.label}</div>
+          <div className={`text-2xl sm:text-3xl font-bold font-mono truncate ${s.color}`}>{s.value}</div>
+          <div className="text-xs text-slate-600 uppercase tracking-widest mt-1 truncate">{s.label}</div>
         </div>
       ))}
     </div>

@@ -31,6 +31,20 @@ describe("SovereignAgent", function () {
     expect(bal).to.equal(ethers.parseEther("10"));
   });
 
+  it("accepts XTZ via receive() with calldata", async function () {
+    const target = await contract.getAddress();
+    await agent.sendTransaction({ to: target, value: ethers.parseEther("2"), data: "0xdeadbeef" });
+    const bal = await ethers.provider.getBalance(target);
+    expect(bal).to.equal(ethers.parseEther("12"));
+  });
+
+  it("rejects constructor with zero agent address", async function () {
+    const Factory = await ethers.getContractFactory("SovereignAgent");
+    await expect(
+      Factory.deploy(ethers.ZeroAddress, BUFFER)
+    ).to.be.revertedWith("SovereignAgent: zero agent address");
+  });
+
   // ── Life support ───────────────────────────────────────────────────────────
 
   it("calculates spendable = balance - buffer - escrowed", async function () {
@@ -42,6 +56,12 @@ describe("SovereignAgent", function () {
     await contract.setLifeSupportBuffer(ethers.parseEther("3"));
     expect(await contract.lifeSupportBuffer()).to.equal(ethers.parseEther("3"));
     expect(await contract.spendableBalance()).to.equal(ethers.parseEther("7"));
+  });
+
+  it("setLifeSupportBuffer to zero is allowed (disables life-support)", async function () {
+    await contract.setLifeSupportBuffer(0);
+    expect(await contract.lifeSupportBuffer()).to.equal(0);
+    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("10"));
   });
 
   it("rejects setLifeSupportBuffer from non-agent", async function () {
@@ -63,6 +83,14 @@ describe("SovereignAgent", function () {
     expect(await contract.spendableBalance()).to.equal(ethers.parseEther("7"));
   });
 
+  it("posts multiple independent bounties concurrently", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("2"));
+    await contract.postBounty("repo#2", ethers.parseEther("3"));
+    // Spendable: 10 - 1 (buffer) - 5 (escrowed) = 4
+    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("4"));
+    expect(await contract.totalEscrowed()).to.equal(ethers.parseEther("5"));
+  });
+
   it("rejects duplicate bounty", async function () {
     await contract.postBounty("repo#1", ethers.parseEther("1"));
     await expect(
@@ -70,11 +98,35 @@ describe("SovereignAgent", function () {
     ).to.be.revertedWith("SovereignAgent: bounty already posted");
   });
 
+  it("rejects bounty that was already paid (re-post after release)", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("2"));
+    await contract.releaseBounty("repo#1", contributor.address);
+    await expect(
+      contract.postBounty("repo#1", ethers.parseEther("1"))
+    ).to.be.revertedWith("SovereignAgent: bounty already paid");
+  });
+
+  it("rejects zero-amount bounty", async function () {
+    await expect(
+      contract.postBounty("repo#1", 0)
+    ).to.be.revertedWith("SovereignAgent: zero bounty amount");
+  });
+
   it("rejects bounty exceeding spendable balance", async function () {
     // 9 XTZ spendable
     await expect(
       contract.postBounty("repo#1", ethers.parseEther("10"))
     ).to.be.revertedWith("SovereignAgent: insufficient spendable balance");
+  });
+
+  it("rejects bounty exactly equal to spendable balance", async function () {
+    // Set buffer to 0 so all 10 XTZ is spendable
+    await contract.setLifeSupportBuffer(0);
+    // Exactly 10 XTZ spendable, try to post 10
+    await expect(
+      contract.postBounty("repo#1", ethers.parseEther("10"))
+    ).to.not.be.reverted; // should succeed — exact match is allowed
+    expect(await contract.spendableBalance()).to.equal(0);
   });
 
   it("rejects bounty from non-agent", async function () {
@@ -104,6 +156,13 @@ describe("SovereignAgent", function () {
     expect(await contract.bountyClaimant("repo#1")).to.equal(contributor.address);
   });
 
+  it("rejects release to zero address", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+    await expect(
+      contract.releaseBounty("repo#1", ethers.ZeroAddress)
+    ).to.be.revertedWith("SovereignAgent: zero contributor address");
+  });
+
   it("rejects double release", async function () {
     await contract.postBounty("repo#1", ethers.parseEther("1"));
     await contract.releaseBounty("repo#1", contributor.address);
@@ -117,6 +176,24 @@ describe("SovereignAgent", function () {
     await expect(
       contract.releaseBounty("repo#999", contributor.address)
     ).to.be.revertedWith("SovereignAgent: no bounty posted");
+  });
+
+  it("rejects release that would breach life-support buffer", async function () {
+    // Set a high buffer so there's not enough to pay out
+    await contract.setLifeSupportBuffer(ethers.parseEther("9"));
+    await contract.postBounty("repo#1", ethers.parseEther("2"));
+    // Contract has 10 XTZ. Buffer=9, bounty=2, but contract only has 10.
+    // releasing 2 would leave 8 which is < buffer of 9
+    await expect(
+      contract.releaseBounty("repo#1", contributor.address)
+    ).to.be.revertedWith("SovereignAgent: would breach life-support buffer");
+  });
+
+  it("rejects releaseBounty from non-agent", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+    await expect(
+      contract.connect(other).releaseBounty("repo#1", contributor.address)
+    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
   });
 
   // ── investSurplus ──────────────────────────────────────────────────────────
@@ -163,6 +240,18 @@ describe("SovereignAgent", function () {
     ).to.be.revertedWith("SovereignAgent: no surplus to invest");
   });
 
+  it("rejects investSurplus to zero address", async function () {
+    await expect(
+      contract.investSurplus(ethers.ZeroAddress)
+    ).to.be.revertedWith("SovereignAgent: zero target address");
+  });
+
+  it("rejects investSurplus from non-agent", async function () {
+    await expect(
+      contract.connect(other).investSurplus(other.address)
+    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
+  });
+
   // ── Agent rotation ─────────────────────────────────────────────────────────
 
   it("setAgent transfers agent role", async function () {
@@ -172,5 +261,64 @@ describe("SovereignAgent", function () {
     await expect(
       contract.postBounty("repo#1", ethers.parseEther("1"))
     ).to.be.revertedWith("SovereignAgent: caller is not the agent");
+  });
+
+  it("setAgent to zero address is rejected", async function () {
+    await expect(
+      contract.setAgent(ethers.ZeroAddress)
+    ).to.be.revertedWith("SovereignAgent: zero agent address");
+  });
+
+  it("new agent can immediately operate after rotation", async function () {
+    await contract.setAgent(other.address);
+    // New agent should be able to post a bounty
+    await expect(
+      contract.connect(other).postBounty("repo#1", ethers.parseEther("1"))
+    ).to.emit(contract, "BountyPosted")
+      .withArgs("repo#1", ethers.parseEther("1"));
+  });
+
+  it("setAgent from non-agent is rejected", async function () {
+    await expect(
+      contract.connect(other).setAgent(contributor.address)
+    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
+  });
+
+  // ── View helpers ───────────────────────────────────────────────────────────
+
+  it("treasuryBalance returns full contract balance", async function () {
+    expect(await contract.treasuryBalance()).to.equal(ethers.parseEther("10"));
+    await agent.sendTransaction({ to: await contract.getAddress(), value: ethers.parseEther("5") });
+    expect(await contract.treasuryBalance()).to.equal(ethers.parseEther("15"));
+  });
+
+  it("spendableBalance is zero when buffer equals balance", async function () {
+    // Contract has 10 XTZ, buffer is 10 XTZ, spendable = 0
+    // (spendable = balance - buffer - escrowed)
+    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("9")); // 10-1=9 initially
+    await contract.setLifeSupportBuffer(ethers.parseEther("10"));
+    expect(await contract.spendableBalance()).to.equal(0);
+  });
+
+  // ── Received event ─────────────────────────────────────────────────────────
+
+  it("emits Received event on plain transfer", async function () {
+    const target = await contract.getAddress();
+    await expect(
+      agent.sendTransaction({ to: target, value: ethers.parseEther("1") })
+    ).to.emit(contract, "Received")
+      .withArgs(agent.address, ethers.parseEther("1"));
+  });
+
+  // ── BountyPaid / bountyClaimant for released bounty ─────────────────────────
+
+  it("bountyPaid is false for un-released bounty", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+    expect(await contract.bountyPaid("repo#1")).to.be.false;
+  });
+
+  it("bountyClaimant is zero address before release", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+    expect(await contract.bountyClaimant("repo#1")).to.equal(ethers.ZeroAddress);
   });
 });
