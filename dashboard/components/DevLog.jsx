@@ -91,8 +91,16 @@ function BountyRow({ bounty }) {
       </td>
 
       {/* Reward */}
-      <td className="py-2.5 pr-4 text-neon-blue font-bold font-mono text-xs whitespace-nowrap">
-        {bounty.reward}
+      <td className="py-2.5 pr-4 text-xs whitespace-nowrap">
+        <span className="text-neon-blue font-bold font-mono">{bounty.reward}</span>
+        {bounty.volatilityNote && (
+          <span
+            className="block text-amber-500 text-xs mt-0.5"
+            title={bounty.volatilityNote}
+          >
+            ⚡ adjusted
+          </span>
+        )}
       </td>
 
       {/* Contributor */}
@@ -129,6 +137,14 @@ function BountyRow({ bounty }) {
           <span className="flex items-center gap-1 text-xs text-tezos-400 bg-tezos-900/30 border border-tezos-700/40 px-2 py-0.5 rounded w-fit">
             <span className="h-1.5 w-1.5 rounded-full bg-tezos-400 animate-pulse" />
             FUNDED
+          </span>
+        ) : bounty.status === "no_payout" ? (
+          <span
+            className="flex items-center gap-1 text-xs text-slate-400 bg-slate-900/30 border border-slate-700/40 px-2 py-0.5 rounded w-fit"
+            title={bounty.noPayoutNote || "Issue resolved without payout"}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+            NO PAYOUT
           </span>
         ) : (
           <span className="flex items-center gap-1 text-xs text-amber-400 bg-amber-900/30 border border-amber-700/40 px-2 py-0.5 rounded w-fit">

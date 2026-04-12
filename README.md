@@ -38,6 +38,7 @@ sovereign-genesis/
 │   ├── judge.js                    # AI PR review (CI status + LLM diff analysis)
 │   ├── executor.js                 # Auto-merges PRs, reads wallet, calls releaseBounty()
 │   ├── financial.js                # Volatility detection, bounty scaling, surplus investment
+│   ├── bounty-creator.js           # AI-powered autonomous bounty generation on new funds
 │   └── logger.js                   # Winston logger
 ├── webhook/
 │   └── server.js                   # GitHub webhook receiver (Express, port 3001)
@@ -90,6 +91,55 @@ sovereign-genesis/
 14. BountyReleased event is indexed — tx hash is surfaced in the dashboard
         for public verification
 ```
+
+---
+
+## AI Reasoning — How OpenAI Powers the Agent
+
+SOVEREIGN-GENESIS uses OpenAI (GPT-4o by default) in two places where the agent needs genuine reasoning, not just rule-following:
+
+### 1. PR Review — Deciding Whether a Merge Is Accepted
+
+When a developer submits a pull request, the agent cannot simply check if files changed — it needs to understand *whether the code is correct, secure, and actually solves the bounty task*. This is where the LLM is called.
+
+**`agent/judge.js`** sends the full PR diff to GPT-4o with a security-aware system prompt. The model reasons about the code and returns a structured verdict:
+
+```json
+{ "verdict": "PASS", "reason": "All requirements implemented, tests present, no security issues." }
+```
+
+The LLM is instructed to **FAIL** a PR if it finds any of:
+- Hardcoded secrets, API keys, or private keys
+- Missing or broken unit tests
+- Reentrancy vulnerabilities in Solidity
+- Logic errors or backdoors
+- The bounty requirements from the PR description were not implemented
+
+Only a **PASS** verdict triggers the auto-merge and on-chain payment. A **FAIL** posts the reason as a review comment so the contributor knows what to fix. The agent never merges code it hasn't reasoned about.
+
+```
+PR opened → CI must pass → GPT-4o reviews diff → PASS/FAIL verdict posted
+                                                        ↓ PASS only
+                                               PR merged + XTZ paid on-chain
+```
+
+### 2. Autonomous Bounty Creation — Deciding What Work to Fund
+
+When new funds arrive, the agent doesn't just wait for humans to create bounty issues — it uses GPT-4o to analyse the repository and generate meaningful improvement tasks autonomously.
+
+**`agent/bounty-creator.js`** gathers context about the project (README, recent commits, open issues, file structure) and asks the LLM to produce actionable tasks with clear acceptance criteria:
+
+```json
+[
+  {
+    "title": "Add end-to-end tests for the bounty payment flow",
+    "task": "Write integration tests covering the full path from PR approval to on-chain payment...",
+    "difficulty": "medium"
+  }
+]
+```
+
+The agent then creates these as GitHub issues with the `Bounty` label and an appropriate XTZ amount based on available funds. The scanner picks them up and funds them on-chain. This closes the loop: funds arrive → agent thinks → bounties appear → developers contribute → XTZ paid out → cycle repeats.
 
 ---
 
@@ -318,7 +368,8 @@ Netlify will auto-deploy on every push to your main branch. The first deploy tri
 > **Note:** The agent and webhook server cannot run on Netlify (they are long-running Node.js processes). For full autonomous operation, run those on a VPS or server separately. The Netlify deployment hosts only the dashboard UI.
 
 ---
-
+## Team Info ##
+This is a solo project. Built and deployed by https://x.com/jennyoliver57
 ## License
 
 MIT

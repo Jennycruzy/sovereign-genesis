@@ -3,9 +3,10 @@
 import { useEffect, useState, useCallback } from "react";
 
 const STATUS_STYLE = {
-  open:      { badge: "OPEN",    color: "text-amber-400",   bg: "bg-amber-900/30 border-amber-700/40",   dot: "bg-amber-400 animate-pulse" },
-  funded:    { badge: "FUNDED",  color: "text-tezos-400",   bg: "bg-tezos-900/30 border-tezos-700/40",   dot: "bg-tezos-400 animate-pulse" },
-  completed: { badge: "PAID",    color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-700/40", dot: "bg-emerald-400" },
+  open:      { badge: "OPEN",       color: "text-amber-400",   bg: "bg-amber-900/30 border-amber-700/40",   dot: "bg-amber-400 animate-pulse" },
+  funded:    { badge: "FUNDED",     color: "text-tezos-400",   bg: "bg-tezos-900/30 border-tezos-700/40",   dot: "bg-tezos-400 animate-pulse" },
+  completed: { badge: "PAID",       color: "text-emerald-400", bg: "bg-emerald-900/30 border-emerald-700/40", dot: "bg-emerald-400" },
+  no_payout: { badge: "NO PAYOUT",  color: "text-slate-400",   bg: "bg-slate-900/30 border-slate-700/40",   dot: "bg-slate-500" },
 };
 
 export default function OpenBounties() {
@@ -27,8 +28,9 @@ export default function OpenBounties() {
     return () => clearInterval(id);
   }, [fetch_]);
 
-  const open    = bounties.filter((b) => b.status !== "completed");
+  const open    = bounties.filter((b) => b.status !== "completed" && b.status !== "no_payout");
   const closed  = bounties.filter((b) => b.status === "completed");
+  const noPayout = bounties.filter((b) => b.status === "no_payout");
 
   return (
     <div className="space-y-6">
@@ -45,6 +47,11 @@ export default function OpenBounties() {
             {closed.length > 0 && (
               <span className="text-xs bg-emerald-900/50 text-emerald-400 border border-emerald-700/40 px-2 py-0.5 rounded">
                 {closed.length} completed
+              </span>
+            )}
+            {noPayout.length > 0 && (
+              <span className="text-xs bg-slate-900/50 text-slate-400 border border-slate-700/40 px-2 py-0.5 rounded">
+                {noPayout.length} no payout
               </span>
             )}
           </div>
@@ -110,10 +117,31 @@ function BountyCard({ bounty }) {
       </p>
 
       {/* Reward */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs text-slate-600 uppercase tracking-wider">Reward:</span>
         <span className="text-sm font-bold font-mono text-neon-blue">{bounty.reward}</span>
+        {bounty.volatilityNote && (
+          <span className="text-xs text-amber-500 bg-amber-900/20 border border-amber-700/30 px-1.5 py-0.5 rounded">
+            ⚡ volatility adjusted
+          </span>
+        )}
       </div>
+
+      {/* Volatility explanation */}
+      {bounty.volatilityNote && (
+        <div className="rounded-md border border-amber-800/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-400 leading-relaxed">
+          <span className="font-semibold">Why was this reduced?</span>{" "}
+          {bounty.volatilityNote}
+        </div>
+      )}
+
+      {/* No-payout explanation */}
+      {bounty.status === "no_payout" && bounty.noPayoutNote && (
+        <div className="rounded-md border border-slate-700/40 bg-slate-900/40 px-3 py-2 text-xs text-slate-400 leading-relaxed">
+          <span className="font-semibold">Issue resolved — no payout:</span>{" "}
+          {bounty.noPayoutNote}
+        </div>
+      )}
 
       {/* Paid to (if completed) */}
       {bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000" && (
@@ -143,7 +171,11 @@ function BountyCard({ bounty }) {
           rel="noopener noreferrer"
           className="flex-1 text-center text-xs px-3 py-2 rounded-lg border border-sovereign-700 bg-sovereign-900/30 text-sovereign-300 hover:bg-sovereign-800/40 transition-colors"
         >
-          {bounty.status === "completed" ? "View Repo" : "Submit via GitHub PR"}
+          {bounty.status === "completed"
+            ? "View Repo"
+            : bounty.status === "no_payout"
+            ? "View Repo"
+            : "Submit via GitHub PR"}
         </a>
         <a
           href={bounty.issueUrl}

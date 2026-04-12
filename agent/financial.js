@@ -92,10 +92,12 @@ async function adviseBountyAmount(requestedXtz) {
   // Rule 2: volatility
   const requestedWei = ethers.parseEther(String(requestedXtz));
   let advisedWei = requestedWei;
+  let reason = null;
 
   if (isHighVolatility()) {
     // Reduce bounty by 50 % under high volatility
     advisedWei = requestedWei / 2n;
+    reason = "high_volatility";
     const advisedXtz = ethers.formatEther(advisedWei);
     logger.warn(
       `Financial: high volatility detected — reducing bounty from ` +
@@ -110,9 +112,10 @@ async function adviseBountyAmount(requestedXtz) {
       `exceeds spendable (${ethers.formatEther(spendable)} XTZ) — capping`
     );
     advisedWei = spendable;
+    reason = reason || "capped";
   }
 
-  return parseFloat(ethers.formatEther(advisedWei));
+  return { amount: parseFloat(ethers.formatEther(advisedWei)), reason };
 }
 
 // ── Surplus investment ────────────────────────────────────────────────────────

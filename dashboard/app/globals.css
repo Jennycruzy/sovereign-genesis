@@ -13,6 +13,7 @@
   box-sizing: border-box;
 }
 
+/* Dark mode (default) */
 body {
   background-color: #050509;
   color: #e2e8f0;
@@ -20,7 +21,13 @@ body {
   overflow-x: hidden;
 }
 
-/* Neon card glow */
+/* Light mode */
+body.light-mode {
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+/* Neon card glow - dark mode */
 .card-glow {
   box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.3),
               0 4px 24px rgba(139, 92, 246, 0.15);
@@ -33,10 +40,26 @@ body {
               0 0 80px rgba(192, 38, 211, 0.15);
 }
 
+/* Light mode card glow */
+body.light-mode .card-glow {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.15),
+              0 4px 12px rgba(139, 92, 246, 0.08);
+}
+
+body.light-mode .card-glow:hover {
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.3),
+              0 4px 20px rgba(139, 92, 246, 0.15);
+}
+
 /* Tezos blue glow */
 .card-glow-blue {
   box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3),
               0 4px 24px rgba(59, 130, 246, 0.15);
+}
+
+body.light-mode .card-glow-blue {
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.15),
+              0 4px 12px rgba(59, 130, 246, 0.08);
 }
 
 /* Scanline effect */
@@ -57,7 +80,7 @@ body {
   100% { transform: translateY(100%); }
 }
 
-/* Neon text */
+/* Neon text - dark mode */
 .text-neon-purple {
   color: #c084fc;
   text-shadow: 0 0 10px rgba(192, 132, 252, 0.8);
@@ -78,13 +101,43 @@ body {
   text-shadow: 0 0 10px rgba(248, 113, 113, 0.8);
 }
 
+/* Light mode - remove glow shadows */
+body.light-mode .text-neon-purple {
+  color: #9333ea;
+  text-shadow: none;
+}
+
+body.light-mode .text-neon-blue {
+  color: #2563eb;
+  text-shadow: none;
+}
+
+body.light-mode .text-neon-green {
+  color: #16a34a;
+  text-shadow: none;
+}
+
+body.light-mode .text-neon-red {
+  color: #dc2626;
+  text-shadow: none;
+}
+
 /* Progress bar glow */
 .progress-glow {
   box-shadow: 0 0 8px rgba(139, 92, 246, 0.8), 0 0 16px rgba(139, 92, 246, 0.4);
 }
 
-/* Scrollbar */
+body.light-mode .progress-glow {
+  box-shadow: 0 0 4px rgba(139, 92, 246, 0.4);
+}
+
+/* Scrollbar - dark mode */
 ::-webkit-scrollbar       { width: 6px; }
 ::-webkit-scrollbar-track { background: #0a0a12; }
 ::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.4); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.7); }
+
+/* Scrollbar - light mode */
+body.light-mode::-webkit-scrollbar-track { background: #f1f5f9; }
+body.light-mode::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.3); border-radius: 3px; }
+body.light-mode::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.5); }
