@@ -1,0 +1,43 @@
+ /* ── Mobile responsiveness
+
+  ───────────────────────────────────────────────── */                
+
+                 
+
+  @media (max-width: 640px) {                                          
+
+    body {
+
+      font-size: 13px;                                                
+
+    }            
+
+
+
+    .card-glow,                                                        
+
+    .card-glow-blue {
+
+      box-shadow: none;                                                
+
+      border: 1px solid rgba(139, 92, 246, 0.25);                      
+
+    }
+
+                                                                       
+
+    .scanline::after {
+
+      display: none;
+
+    }
+
+                                                                       
+
+    ::-webkit-scrollbar {
+
+      width: 0px;                                                      
+
+    }            
+
+  }
