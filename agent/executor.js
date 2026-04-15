@@ -44,10 +44,31 @@ async function resolveContributorWallet(prNumber) {
 }
 
 /**
- * Build the canonical PR ID string used as the mapping key in the contract.
+ * Extract the linked issue number from a PR body.
+ * Looks for "Closes #X", "Fixes #X", or "Resolves #X".
+ * Falls back to the PR number if no linked issue is found.
  */
-function buildPrId(prNumber) {
-  return `${REPO_OWNER}/${REPO_NAME}#${prNumber}`;
+async function resolveLinkedIssueNumber(prNumber) {
+  try {
+    const { data: pr } = await octokit.pulls.get({
+      owner:       REPO_OWNER,
+      repo:        REPO_NAME,
+      pull_number: prNumber,
+    });
+    const match = pr.body?.match(/(?:closes|fixes|resolves)\s+#(\d+)/i);
+    if (match) return parseInt(match[1]);
+  } catch (err) {
+    logger.warn(`Executor: could not resolve linked issue for PR #${prNumber} — ${err.message}`);
+  }
+  return prNumber;
+}
+
+/**
+ * Build the canonical PR ID string used as the mapping key in the contract.
+ * Uses the linked issue number if present (matches what the scanner stored on-chain).
+ */
+function buildPrId(number) {
+  return `${REPO_OWNER}/${REPO_NAME}#${number}`;
 }
 
 /**
@@ -109,8 +130,9 @@ async function postMergedNoWalletComment(prNumber) {
  * @returns {{ merged: boolean, txHash: string | null, error: string | null }}
  */
 async function executeApprovedPr(prNumber) {
-  const prId = buildPrId(prNumber);
-  logger.info(`Executor: processing approved PR #${prNumber} (${prId})`);
+  const issueNumber = await resolveLinkedIssueNumber(prNumber);
+  const prId = buildPrId(issueNumber);
+  logger.info(`Executor: processing approved PR #${prNumber} → issue #${issueNumber} (${prId})`);
 
   // ── 0. Pre-flight: wallet check BEFORE merging ────────────────────────────
   // We refuse to merge without a wallet so the PR stays open for the contributor
