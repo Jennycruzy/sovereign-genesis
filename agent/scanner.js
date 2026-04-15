@@ -4,6 +4,13 @@
  * Polls the configured repository for issues labelled with bounty-related tags.
  * Parses the bounty amount from the issue body or uses configured label mappings.
  * Calls postBounty() on the smart contract for any new (unseen) bounties.
+ *
+ * Dynamic Polling Strategy:
+ * - Base interval: 60 seconds (configurable via POLL_INTERVAL_MS env var)
+ * - Min interval: 15 seconds  (when many open issues or high activity)
+ * - Max interval: 300 seconds (5 min, when no activity and no open issues)
+ * - Activity score = (open_issue_count * weight) + recent_activity_bonus
+ * - Interval scales inversely with activity score
  */
 const { ethers }   = require("ethers");
 const { Octokit }  = require("@octokit/rest");
@@ -14,6 +21,89 @@ const logger       = require("./logger");
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split("/");
+
+/**
+ * Dynamic polling configuration
+ */
+const BASE_INTERVAL_MS  = parseInt(process.env.POLL_INTERVAL_MS || "60000", 10);
+const MIN_INTERVAL_MS   = parseInt(process.env.POLL_MIN_INTERVAL_MS || "15000", 10);
+const MAX_INTERVAL_MS    = parseInt(process.env.POLL_MAX_INTERVAL_MS || "300000", 10);
+const ACTIVITY_DECAY_MS  = parseInt(process.env.POLL_ACTIVITY_DECAY_MS || "300000", 10); // 5 min
+const ISSUE_WEIGHT       = 10;   // ms discount per open issue
+const ACTIVITY_BONUS     = 5000; // ms discount when recent activity detected
+
+/**
+ * Polling state for dynamic interval calculation
+ */
+let currentIntervalMs  = BASE_INTERVAL_MS;
+let lastActivityTime    = Date.now();
+let lastIssueCount     = 0;
+let scanCount          = 0;
+let consecutiveEmpty    = 0; // count of consecutive scans with no new bounties
+
+/**
+ * Calculate dynamic interval based on activity and open issue count.
+ * Higher activity / more open issues → shorter interval.
+ * No activity for a while → gradually increase interval up to MAX.
+ */
+function calculateDynamicInterval(openIssueCount, hasRecentActivity) {
+  const now = Date.now();
+
+  // Time since last activity (in seconds)
+  const inactiveMs = now - lastActivityTime;
+
+  // Base: start from current interval
+  let interval = currentIntervalMs;
+
+  // If we have recent activity, reduce interval (poll faster)
+  if (hasRecentActivity || openIssueCount > 0) {
+    const activityDiscount = Math.min(
+      ACTIVITY_BONUS,
+      Math.floor(inactiveMs / 1000) * 100 // 100ms discount per second of inactivity (up to ACTIVITY_BONUS)
+    );
+    interval = Math.max(MIN_INTERVAL_MS, interval - activityDiscount - (openIssueCount * ISSUE_WEIGHT));
+  } else if (inactiveMs > ACTIVITY_DECAY_MS) {
+    // No activity for a while — back off exponentially toward MAX
+    const backoffMultiplier = Math.min(4, 1 + (inactiveMs / ACTIVITY_DECAY_MS));
+    interval = Math.min(MAX_INTERVAL_MS, Math.round(interval * backoffMultiplier));
+  }
+
+  return interval;
+}
+
+/**
+ * Update polling state after each scan.
+ */
+function updatePollingState(openIssueCount, foundBounty) {
+  const now = Date.now();
+  lastIssueCount = openIssueCount;
+  scanCount++;
+
+  if (foundBounty) {
+    lastActivityTime = now;
+    consecutiveEmpty = 0;
+  } else {
+    consecutiveEmpty++;
+  }
+
+  // Update interval for next cycle
+  const hasRecentActivity = (now - lastActivityTime) < ACTIVITY_DECAY_MS;
+  currentIntervalMs = calculateDynamicInterval(openIssueCount, hasRecentActivity);
+}
+
+/**
+ * Get performance metrics for logging/reporting.
+ */
+function getPollingMetrics() {
+  return {
+    intervalMs:      currentIntervalMs,
+    lastIssueCount,
+    scanCount,
+    consecutiveEmpty,
+    lastActivityAge: Date.now() - lastActivityTime,
+    uptime:          process.uptime(),
+  };
+}
 
 /**
  * BOUNTY_LABELS configuration.
@@ -114,8 +204,10 @@ async function postVolatilityComment(issueNumber, originalXtz, advisedXtz) {
 
 /**
  * Single scan pass.
+ * Returns { foundBounty: boolean, openCount: number }
  */
 async function scan() {
+  const scanStart = Date.now();
   logger.info(`Scanner: checking for issues with labels: ${SCAN_LABELS}…`);
 
   let issues = [];
@@ -131,14 +223,17 @@ async function scan() {
       });
       issues.push(...data);
     }
-    
+
     // Deduplicate issues by number
     issues = Array.from(new Map(issues.map(item => [item.number, item])).values());
-    
+
   } catch (err) {
     logger.error(`Scanner: GitHub API error — ${err.message}`);
-    return;
+    return { foundBounty: false, openCount: 0 };
   }
+
+  let foundBounty = false;
+  const openCount = issues.length;
 
   for (const issue of issues) {
     if (postedIssues.has(issue.number)) continue;
@@ -178,6 +273,7 @@ async function scan() {
     try {
       await contract.postBounty(prId, advisedAmount);
       postedIssues.add(issue.number);
+      foundBounty = true;
 
       if (adjustReason === "high_volatility") {
         logger.info(`Scanner: bounty reduced by financial advisor (volatility): ${amount} → ${advisedAmount} XTZ`);
@@ -191,15 +287,63 @@ async function scan() {
       logger.error(`Scanner: failed to post bounty for ${prId} — ${err.message}`);
     }
   }
+
+  const scanDuration = Date.now() - scanStart;
+  logger.info(
+    `Scanner: scan #${scanCount + 1} complete in ${scanDuration}ms — ` +
+    `${openCount} open issues, foundBounty=${foundBounty}, ` +
+    `nextInterval=${(currentIntervalMs / 1000).toFixed(1)}s`
+  );
+
+  return { foundBounty, openCount };
 }
 
 /**
- * Start the polling loop.
+ * Dynamic polling loop.
+ * Adjusts interval after each scan based on activity and open issue count.
  */
-function start(intervalMs = 60_000) {
-  logger.info(`Scanner: starting poll every ${intervalMs / 1000}s`);
-  scan(); // immediate first pass
-  return setInterval(scan, intervalMs);
+let pollTimer = null;
+
+async function pollCycle() {
+  const { foundBounty, openCount } = await scan();
+  updatePollingState(openCount, foundBounty);
+
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+  }
+  pollTimer = setTimeout(pollCycle, currentIntervalMs);
+  logger.info(`Scanner: next poll in ${(currentIntervalMs / 1000).toFixed(1)}s (intervalMs=${currentIntervalMs})`);
+}
+
+/**
+ * Start the dynamic polling loop.
+ * @param {number} initialIntervalMs - Override the starting interval (uses BASE_INTERVAL_MS otherwise)
+ */
+function start(initialIntervalMs) {
+  if (initialIntervalMs) {
+    currentIntervalMs = initialIntervalMs;
+  }
+
+  const metrics = getPollingMetrics();
+  logger.info(
+    `Scanner: starting dynamic poll — baseInterval=${BASE_INTERVAL_MS}ms, ` +
+    `min=${MIN_INTERVAL_MS}ms, max=${MAX_INTERVAL_MS}ms, ` +
+    `initialInterval=${currentIntervalMs}ms`
+  );
+
+  // Immediate first pass
+  pollCycle();
+
+  return {
+    stop: () => {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+        logger.info("Scanner: stopped");
+      }
+    },
+    getMetrics: getPollingMetrics,
+  };
 }
 
 module.exports = { start, scan };
