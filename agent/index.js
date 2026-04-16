@@ -86,9 +86,16 @@ async function bootstrap() {
   // Print initial health
   await financial.printHealthReport();
 
-  // Start GitHub scanner (polls every SCAN_INTERVAL_MS, default 60 s)
-  const scanInterval = parseInt(process.env.SCAN_INTERVAL_MS || "60000", 10);
-  scanner.start(scanInterval);
+const scheduler  = require("./scheduler");
+
+// ... (rest of the imports)
+
+  // Start GitHub scanner (Dynamic polling via scheduler)
+  scanner.scan(); // immediate first pass
+  scheduler.updateTimer(async () => {
+      await scanner.scan();
+      scheduler.updateTimer(scanner.scan); // Schedule next dynamic tick
+  });
 
   // Financial awareness loop (every FINANCIAL_INTERVAL_MS, default 5 min)
   const finInterval = parseInt(process.env.FINANCIAL_INTERVAL_MS || "300000", 10);
