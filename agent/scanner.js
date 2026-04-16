@@ -11,6 +11,8 @@ const contract     = require("./contract");
 const financial    = require("./financial");
 const logger       = require("./logger");
 
+const polling = require('./polling-interval');
+
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
 const [REPO_OWNER, REPO_NAME] = (process.env.GITHUB_REPO || "owner/repo").split("/");
@@ -197,9 +199,18 @@ async function scan() {
  * Start the polling loop.
  */
 function start(intervalMs = 60_000) {
-  logger.info(`Scanner: starting poll every ${intervalMs / 1000}s`);
-  scan(); // immediate first pass
-  return setInterval(scan, intervalMs);
+function start(initialIntervalMs = 60_000) {
+  const manager = polling.createManager();
+  let timer;
+  function scheduleNext(count) {
+    const interval = manager.getInterval(count);
+    logger.info('Next poll: ' + (interval/1000) + 's');
+    timer = setTimeout(async () => { await scan(); manager.recordActivity(); scheduleNext(count); }, interval);
+  }
+  logger.info('Dynamic polling started');
+  scan();
+  scheduleNext(0);
+  return { cancel() { clearTimeout(timer); manager.destroy(); } };
 }
 
 module.exports = { start, scan };
