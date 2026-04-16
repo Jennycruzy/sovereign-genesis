@@ -4,12 +4,15 @@
  * Polls the configured repository for issues labelled with bounty-related tags.
  * Parses the bounty amount from the issue body or uses configured label mappings.
  * Calls postBounty() on the smart contract for any new (unseen) bounties.
+ * 
+ * Uses SmartIssuePoller for adaptive polling intervals based on success/failure rates.
  */
-const { ethers }   = require("ethers");
-const { Octokit }  = require("@octokit/rest");
-const contract     = require("./contract");
-const financial    = require("./financial");
-const logger       = require("./logger");
+const { ethers }      = require("ethers");
+const { Octokit }     = require("@octokit/rest");
+const contract        = require("./contract");
+const financial       = require("./financial");
+const logger          = require("./logger");
+const SmartIssuePoller = require("./smart-poller");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 
@@ -36,6 +39,9 @@ const SCAN_LABELS = Object.keys(BOUNTY_LABEL_MAP).join(",");
 
 // In-memory set of issue numbers already posted on-chain.
 const postedIssues = new Set();
+
+// Smart poller instance for adaptive interval management
+let poller = null;
 
 /**
  * Parse a bounty amount (XTZ) from an issue body.
@@ -194,12 +200,50 @@ async function scan() {
 }
 
 /**
- * Start the polling loop.
+ * Start the polling loop with smart adaptive intervals.
+ * @param {Object} config - Poller configuration
+ * @param {number} config.baseInterval - Base interval in ms (default: 60000)
+ * @param {number} config.maxInterval - Max interval in ms (default: 300000)
+ * @param {number} config.minInterval - Min interval in ms (default: 30000)
  */
-function start(intervalMs = 60_000) {
-  logger.info(`Scanner: starting poll every ${intervalMs / 1000}s`);
-  scan(); // immediate first pass
-  return setInterval(scan, intervalMs);
+function start(config = {}) {
+    const pollerConfig = {
+        baseInterval: parseInt(process.env.SCAN_INTERVAL_MS || config.baseInterval || "60000", 10),
+        maxInterval: parseInt(process.env.SCAN_MAX_INTERVAL_MS || config.maxInterval || "300000", 10),
+        minInterval: parseInt(process.env.SCAN_MIN_INTERVAL_MS || config.minInterval || "30000", 10),
+        enableExponentialBackoff: process.env.SCAN_ENABLE_BACKOFF !== "false",
+        backoffMultiplier: parseFloat(process.env.SCAN_BACKOFF_MULTIPLIER || "1.5"),
+        failureThreshold: parseInt(process.env.SCAN_FAILURE_THRESHOLD || "3", 10),
+    };
+
+    poller = new SmartIssuePoller(pollerConfig);
+    
+    logger.info(`Scanner: starting smart poll with adaptive intervals`);
+    logger.info(`Scanner: config - base=${pollerConfig.baseInterval}ms, ` +
+        `max=${pollerConfig.maxInterval}ms, min=${pollerConfig.minInterval}ms`);
+    
+    // Immediate first pass
+    scan().catch(err => {
+        logger.error(`Scanner: initial scan failed - ${err.message}`);
+    });
+    
+    // Adaptive polling loop
+    const pollLoop = async () => {
+        if (poller.shouldPoll()) {
+            try {
+                await poller.poll(scan);
+            } catch (err) {
+                // Error already handled by poller
+            }
+        }
+        // Check again in 5 seconds (lightweight check)
+        setTimeout(pollLoop, 5000);
+    };
+    
+    pollLoop();
+    
+    // Export poller for status monitoring
+    return { poller };
 }
 
 module.exports = { start, scan };
