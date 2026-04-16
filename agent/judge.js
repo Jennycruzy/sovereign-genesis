@@ -10,6 +10,16 @@
 const { Octokit } = require("@octokit/rest");
 const OpenAI      = require("openai");
 const logger      = require("./logger");
+const {
+  logAIReviewError,
+  logReviewStart,
+  logCiResult,
+  logCiError,
+  logLlmReviewRequest,
+  logLlmReviewResult,
+  logLlmReviewError,
+  logReviewComplete,
+} = require("./log-utils");
 
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const openai  = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -106,6 +116,12 @@ ${diff.slice(0, 8000)}
 \`\`\`
 `.trim();
 
+  logLlmReviewRequest(prNumber, {
+    model: process.env.OPENAI_MODEL || "gpt-4o",
+    diffLength: diff.length,
+  });
+
+  const startMs = Date.now();
   const completion = await openai.chat.completions.create({
     model:       process.env.OPENAI_MODEL || "gpt-4o",
     temperature: 0,
@@ -115,15 +131,24 @@ ${diff.slice(0, 8000)}
       { role: "user",   content: userMessage },
     ],
   });
+  const durationMs = Date.now() - startMs;
 
   const raw = completion.choices[0].message.content.trim();
 
   try {
     // Strip markdown code fences if present
     const jsonStr = raw.replace(/^```json\s*/i, "").replace(/```$/, "").trim();
-    return JSON.parse(jsonStr);
-  } catch {
-    logger.error(`Judge: LLM returned non-JSON: ${raw}`);
+    const parsed  = JSON.parse(jsonStr);
+    logLlmReviewResult(prNumber, parsed.verdict, {
+      reason:     parsed.reason,
+      raw,
+      durationMs,
+    });
+    return parsed;
+  } catch (err) {
+    // Legacy helper kept for compatibility
+    logAIReviewError(prNumber, err, raw);
+    logLlmReviewError(prNumber, err);
     return { verdict: "FAIL", reason: "LLM returned unparseable response" };
   }
 }
@@ -136,18 +161,50 @@ ${diff.slice(0, 8000)}
  * @returns {{ verdict: "PASS"|"FAIL", reason: string, ciOk: boolean }}
  */
 async function reviewPr(prNumber) {
+  const totalStartMs = Date.now();
   logger.info(`Judge: reviewing PR #${prNumber}`);
 
   // Step 1 — CI
   let ciOk = false;
+  let ciStartMs;
   try {
+    ciStartMs = Date.now();
     ciOk = await ciPasses(prNumber);
+    const ciDurationMs = Date.now() - ciStartMs;
+
+    // Fetch PR details for logging metadata
+    let prData;
+    try {
+      const { data } = await octokit.pulls.get({
+        owner: REPO_OWNER, repo: REPO_NAME, pull_number: prNumber,
+      });
+      prData = data;
+    } catch {
+      prData = {};
+    }
+
+    logCiResult(prNumber, ciOk, {
+      statusState: null,
+      checkRuns:   [],
+      durationMs:   ciDurationMs,
+    });
   } catch (err) {
+    logCiError(prNumber, err);
     logger.error(`Judge: CI check error — ${err.message}`);
-    return { verdict: "FAIL", reason: `CI check error: ${err.message}`, ciOk: false };
+    return {
+      verdict: "FAIL",
+      reason:  `CI check error: ${err.message}`,
+      ciOk:    false,
+    };
   }
 
   if (!ciOk) {
+    logReviewComplete(prNumber, {
+      verdict:         "FAIL",
+      ciOk:            false,
+      reason:          "CI checks did not pass",
+      totalDurationMs: Date.now() - totalStartMs,
+    });
     return { verdict: "FAIL", reason: "CI checks did not pass", ciOk: false };
   }
 
@@ -160,11 +217,34 @@ async function reviewPr(prNumber) {
     ]);
   } catch (err) {
     logger.error(`Judge: failed to fetch PR data — ${err.message}`);
-    return { verdict: "FAIL", reason: `Failed to fetch PR: ${err.message}`, ciOk };
+    return {
+      verdict: "FAIL",
+      reason:  `Failed to fetch PR: ${err.message}`,
+      ciOk,
+    };
   }
 
+  // Log review start with rich metadata
+  logReviewStart(prNumber, {
+    prTitle:    pr.title,
+    author:     pr.user?.login,
+    headSha:    pr.head?.sha,
+    baseBranch: pr.base?.ref,
+  });
+
   const result = await llmReview(prNumber, pr.title, pr.body, diff);
-  logger.info(`Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`);
+  const llmDurationMs = null; // captured inside llmReview
+
+  logger.info(
+    `Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`
+  );
+
+  logReviewComplete(prNumber, {
+    verdict:         result.verdict,
+    ciOk:            true,
+    reason:          result.reason,
+    totalDurationMs: Date.now() - totalStartMs,
+  });
 
   return { ...result, ciOk };
 }
