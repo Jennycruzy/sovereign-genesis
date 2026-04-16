@@ -157,11 +157,12 @@ function getBountyAmount(issue) {
   // If we found a label with an associated amount, return it
   if (labelAmount > 0) return labelAmount;
 
-  // Fallback to body parsing if we matched a label but it had no hardcoded amount
-  if (hasLabelMatch) {
-    return parseBountyAmountFromBody(issue.body || "");
-  }
+  // Fallback to body parsing — either no label matched at all,
+  // or the matched label had no hardcoded amount (null)
+  const bodyAmount = parseBountyAmountFromBody(issue.body || "");
+  if (bodyAmount !== null) return bodyAmount;
 
+  // No amount found anywhere
   return null;
 }
 
