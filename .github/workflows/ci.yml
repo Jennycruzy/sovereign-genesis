@@ -33,7 +33,6 @@ jobs:
 
       - name: Run agent tests
         run: npm run test:agent --if-present
-        continue-on-error: true
 
   contract-test:
     runs-on: ubuntu-latest
@@ -51,8 +50,6 @@ jobs:
 
       - name: Compile contracts
         run: npx hardhat compile --if-present
-        continue-on-error: true
 
       - name: Run contract tests
         run: npx hardhat test --if-present
-        continue-on-error: true
