@@ -153,18 +153,28 @@ async function reviewPr(prNumber) {
 
   // Step 2 — LLM diff review
   let diff, pr;
+  const startTime = Date.now();
   try {
     [diff, { data: pr }] = await Promise.all([
       getPrDiff(prNumber),
       octokit.pulls.get({ owner: REPO_OWNER, repo: REPO_NAME, pull_number: prNumber }),
     ]);
   } catch (err) {
-    logger.error(`Judge: failed to fetch PR data — ${err.message}`);
+    logger.error(`Judge: failed to fetch PR data — ${err.message}`, { prNumber, error: err.stack });
     return { verdict: "FAIL", reason: `Failed to fetch PR: ${err.message}`, ciOk };
   }
 
   const result = await llmReview(prNumber, pr.title, pr.body, diff);
-  logger.info(`Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`);
+  const durationMs = Date.now() - startTime;
+  
+  logger.info(`Judge: PR #${prNumber} verdict = ${result.verdict} — ${result.reason}`, {
+    prNumber,
+    verdict: result.verdict,
+    reason: result.reason,
+    durationMs,
+    diffLength: diff.length,
+    timestamp: new Date().toISOString()
+  });
 
   return { ...result, ciOk };
 }
