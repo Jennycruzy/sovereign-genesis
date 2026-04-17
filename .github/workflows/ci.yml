@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-contracts:
+    name: Test Solidity Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Compile contracts
+        run: npm run compile
+
+      - name: Run contract tests
+        run: npm test
+
+  test-dashboard:
+    name: Build Dashboard
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+        working-directory: ./dashboard
+
+      - name: Install dashboard dependencies
+        run: npm ci
+        working-directory: ./dashboard
+
+      - name: Build dashboard
+        run: npm run build
+        working-directory: ./dashboard
+
+  test-agent:
+    name: Lint Agent Code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Check agent syntax
+        run: node --check agent/index.js && node --check scripts/*.js && echo "Agent scripts syntax OK"
