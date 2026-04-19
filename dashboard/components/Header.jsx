@@ -35,7 +35,7 @@ export default function Header({ lastUpdated }) {
         ? 'border-sovereign-900/60 bg-[#050509]/90' 
         : 'border-light-border bg-light-card'
     }`}>
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
         {/* Logo / title */}
         <div className="flex items-center gap-4">
           <div className="relative">
@@ -66,7 +66,7 @@ export default function Header({ lastUpdated }) {
         </div>
 
         {/* Status bar + Theme Toggle */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs">
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}

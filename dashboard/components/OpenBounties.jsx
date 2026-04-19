@@ -33,11 +33,11 @@ export default function OpenBounties() {
   const noPayout = bounties.filter((b) => b.status === "no_payout");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Section header */}
-      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
+      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 backdrop-blur">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-5">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
               Open Bounties
             </h2>
@@ -59,7 +59,7 @@ export default function OpenBounties() {
         </div>
 
         {/* How to submit */}
-        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 mb-6">
+        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3 sm:p-4 mb-4 sm:mb-6">
           <h3 className="text-sm font-bold text-slate-300 mb-2">How to Contribute</h3>
           <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
             <li>Fork the repository and complete the bounty task</li>
@@ -96,11 +96,11 @@ function BountyCard({ bounty }) {
   const s = STATUS_STYLE[bounty.status] || STATUS_STYLE.open;
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
+    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-4 sm:p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
       {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-slate-200 leading-snug">
+          <h3 className="text-xs sm:text-sm font-bold text-slate-200 leading-snug">
             {bounty.title}
           </h3>
           <span className="text-xs text-slate-600 mt-0.5">#{bounty.id}</span>
