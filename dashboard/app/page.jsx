@@ -44,7 +44,7 @@ export default function DashboardPage() {
     <div className="min-h-screen flex flex-col">
       <Header lastUpdated={lastPoll} />
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-6">
+      <main className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-6">
 
         {/* Error banner */}
         {error && (

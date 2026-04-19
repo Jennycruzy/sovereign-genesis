@@ -22,16 +22,16 @@ export default function AgentHealth({ data }) {
     "#ef4444";
 
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur">
+    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 backdrop-blur">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div className="flex items-center gap-3">
           <div className={`h-3 w-3 rounded-full ${isHealthy ? "bg-emerald-400 animate-pulse" : "bg-red-500 animate-pulse"}`} />
-          <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
+          <h2 className="text-base sm:text-lg font-bold tracking-widest uppercase text-sovereign-300">
             Agent Health
           </h2>
         </div>
-        <span className={`text-xs px-2 py-1 rounded font-bold tracking-widest ${
+        <span className={`text-xs px-2 py-1 rounded font-bold tracking-widest `}, {
           isHealthy
             ? "bg-emerald-900/50 text-emerald-400 border border-emerald-700/50"
             : "bg-red-900/50 text-red-400 border border-red-700/50"
@@ -41,7 +41,7 @@ export default function AgentHealth({ data }) {
       </div>
 
       {/* Metrics grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <Metric
           label="Treasury Balance"
           value={`${treasury.toFixed(4)} XTZ`}
@@ -86,14 +86,14 @@ export default function AgentHealth({ data }) {
       </div>
 
       {/* Network info */}
-      <div className="mt-5 pt-4 border-t border-slate-800 flex flex-wrap gap-4 text-xs text-slate-500">
+      <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-slate-800 flex flex-wrap gap-3 sm:gap-4 text-xs text-slate-500">
         <span>
           <span className="text-slate-400">Network: </span>
           <span className="text-tezos-400 uppercase">{data.network || "—"}</span>
         </span>
-        <span className="truncate">
+        <span className="truncate max-w-[200px] sm:max-w-none">
           <span className="text-slate-400">Contract: </span>
-          <span className="text-sovereign-400 font-mono">{data.address || "—"}</span>
+          <span className="text-sovereign-400 font-mono text-[10px] sm:text-xs">{data.address || "—"}</span>
         </span>
         {data.demo && (
           <span className="px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-400 border border-amber-700/40">
@@ -119,9 +119,9 @@ function Metric({ label, value, color, icon }) {
 
 function SkeletonPanel() {
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 animate-pulse">
+    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 animate-pulse">
       <div className="h-6 w-40 bg-slate-700 rounded mb-6" />
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {[0,1,2].map(i => <div key={i} className="h-20 bg-slate-800 rounded-lg" />)}
       </div>
       <div className="h-3 bg-slate-800 rounded-full" />

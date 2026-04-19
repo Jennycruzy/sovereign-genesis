@@ -14,9 +14,9 @@ const EVENT_META = {
 
 export default function TreasuryFeed({ events = [], isLoading }) {
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur h-full">
+    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 sm:p-6 backdrop-blur h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4 sm:mb-5">
         <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
           Treasury Activity
         </h2>
@@ -26,7 +26,7 @@ export default function TreasuryFeed({ events = [], isLoading }) {
       </div>
 
       {/* Feed */}
-      <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+      <div className="space-y-2 max-h-[280px] sm:max-h-[380px] overflow-y-auto pr-1">
         {events.length === 0 ? (
           <div className="text-center text-slate-600 text-sm py-8">
             No events yet. Deploy contract and fund treasury.
