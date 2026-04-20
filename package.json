@@ -1,32 +1,54 @@
 {
   "name": "sovereign-genesis",
   "version": "1.0.0",
-  "description": "SOVEREIGN-GENESIS: Self-evolving autonomous AI agent on Tezos Etherlink",
-  "private": true,
+  "description": "A financially sovereign, self-evolving AI agent on Tezos Etherlink",
+  "main": "agent/index.js",
   "scripts": {
-    "compile":       "hardhat compile",
-    "test":          "hardhat test",
-    "deploy:testnet": "hardhat run scripts/deploy.js --network etherlink_testnet",
-    "deploy:mainnet": "hardhat run scripts/deploy.js --network etherlink_mainnet",
-    "agent":         "node agent/index.js",
-    "webhook":       "node webhook/server.js"
+    "start": "node agent/index.js",
+    "webhook": "node webhook/server.js",
+    "compile": "npx hardhat compile",
+    "deploy": "npx hardhat run scripts/deploy.js --network etherlink",
+    "test": "jest",
+    "test:contract": "npx hardhat test",
+    "lint": "eslint agent/ webhook/ scripts/ --ext .js",
+    "lint:fix": "eslint agent/ webhook/ scripts/ --ext .js --fix"
   },
   "dependencies": {
-    "@openzeppelin/contracts":              "^5.0.2",
-    "@octokit/rest":                        "^20.1.1",
-    "dotenv":                               "^16.4.5",
-    "ethers":                               "^6.11.1",
-    "express":                              "^4.18.2",
-    "body-parser":                          "^1.20.2",
-    "openai":                               "^4.38.5",
-    "node-fetch":                           "^3.3.2",
-    "winston":                              "^3.13.0"
+    "@openzeppelin/contracts": "^5.0.0",
+    "ethers": "^6.8.0",
+    "express": "^4.18.2",
+    "winston": "^3.11.0",
+    "dotenv": "^16.3.1",
+    "axios": "^1.6.0",
+    "openai": "^4.20.1"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox":     "^5.0.0",
-    "hardhat":                              "^2.22.3"
+    "hardhat": "^2.19.0",
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.29.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.1.1"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  }
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverage": true,
+    "coverageDirectory": "coverage",
+    "testMatch": [
+      "**/test/**/*.test.js",
+      "**/agent/**/*.test.js"
+    ]
+  },
+  "keywords": [
+    "ai",
+    "blockchain",
+    "tezos",
+    "etherlink",
+    "autonomous",
+    "bounty"
+  ],
+  "author": "SOVEREIGN-GENESIS",
+  "license": "MIT"
 }
