@@ -1,176 +1,191 @@
 const { expect } = require("chai");
-const { ethers }  = require("hardhat");
+const { ethers } = require("hardhat");
 
 describe("SovereignAgent", function () {
-  let contract, agent, contributor, other;
-  const BUFFER = ethers.parseEther("1"); // 1 XTZ
+    let SovereignAgent;
+    let sovereignAgent;
+    let owner;
+    let addr1;
+    let addr2;
+    let investmentWallet;
 
-  beforeEach(async function () {
-    [agent, contributor, other] = await ethers.getSigners();
-
-    const Factory = await ethers.getContractFactory("SovereignAgent");
-    contract = await Factory.deploy(agent.address, BUFFER);
-    await contract.waitForDeployment();
-
-    // Seed treasury with 10 XTZ
-    await agent.sendTransaction({
-      to: await contract.getAddress(),
-      value: ethers.parseEther("10"),
+    // This beforeEach hook runs before each test in this suite
+    beforeEach(async function () {
+        // Get the list of test accounts from Hardhat
+        [owner, addr1, addr2, investmentWallet] = await ethers.getSigners();
+        
+        // Get the ContractFactory for SovereignAgent
+        SovereignAgent = await ethers.getContractFactory("SovereignAgent");
+        
+        // Deploy the contract. The constructor of SovereignAgent is assumed to take an initial owner address.
+        // We set the 'owner' (first signer) as the initial owner of the contract.
+        sovereignAgent = await SovereignAgent.deploy(owner.address);
+        
+        // Wait for the contract to be deployed on the local Hardhat network
+        await sovereignAgent.waitForDeployment();
     });
-  });
 
-  // ── Deployment ─────────────────────────────────────────────────────────────
+    describe("postBounty", function () {
+        it("should allow anyone to post a bounty with ETH and emit a BountyPosted event", async function () {
+            const bountyAmount = ethers.parseEther("1"); // 1 ETH
+            const description = "Help fix the dashboard UI responsiveness";
 
-  it("sets agent and lifeSupportBuffer on deploy", async function () {
-    expect(await contract.agent()).to.equal(agent.address);
-    expect(await contract.lifeSupportBuffer()).to.equal(BUFFER);
-  });
+            // addr1 posts a bounty, sending 1 ETH along with the transaction
+            // Expect an event 'BountyPosted' to be emitted with correct arguments
+            await expect(sovereignAgent.connect(addr1).postBounty(description, { value: bountyAmount }))
+                .to.emit(sovereignAgent, "BountyPosted")
+                .withArgs(0, addr1.address, bountyAmount, description); // The first bounty ID is 0
 
-  it("accepts XTZ via receive()", async function () {
-    const bal = await ethers.provider.getBalance(await contract.getAddress());
-    expect(bal).to.equal(ethers.parseEther("10"));
-  });
+            // Verify the bounty details stored in the contract's 'bounties' mapping
+            const bounty = await sovereignAgent.bounties(0); 
+            expect(bounty.poster).to.equal(addr1.address);
+            expect(bounty.amount).to.equal(bountyAmount);
+            expect(bounty.description).to.equal(description);
+            expect(bounty.released).to.be.false; // Bounty should not be released yet
 
-  // ── Life support ───────────────────────────────────────────────────────────
+            // Verify the contract's ETH balance increased by the bounty amount
+            expect(await ethers.provider.getBalance(sovereignAgent.target)).to.equal(bountyAmount);
+        });
 
-  it("calculates spendable = balance - buffer - escrowed", async function () {
-    // 10 XTZ - 1 XTZ buffer = 9 XTZ spendable
-    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("9"));
-  });
+        it("should increment nextBountyId for each new bounty posted", async function () {
+            const bountyAmount1 = ethers.parseEther("0.5");
+            const bountyAmount2 = ethers.parseEther("0.75");
 
-  it("setLifeSupportBuffer updates buffer", async function () {
-    await contract.setLifeSupportBuffer(ethers.parseEther("3"));
-    expect(await contract.lifeSupportBuffer()).to.equal(ethers.parseEther("3"));
-    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("7"));
-  });
+            // Post the first bounty
+            await sovereignAgent.connect(addr1).postBounty("Bounty 1 description", { value: bountyAmount1 });
+            // After the first bounty, nextBountyId should be 1
+            expect(await sovereignAgent.nextBountyId()).to.equal(1); 
 
-  it("rejects setLifeSupportBuffer from non-agent", async function () {
-    await expect(
-      contract.connect(other).setLifeSupportBuffer(0)
-    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
-  });
+            // Post the second bounty
+            await sovereignAgent.connect(addr2).postBounty("Bounty 2 description", { value: bountyAmount2 });
+            // After the second bounty, nextBountyId should be 2
+            expect(await sovereignAgent.nextBountyId()).to.equal(2); 
 
-  // ── Bounty posting ─────────────────────────────────────────────────────────
+            // Verify the total contract balance reflects both bounties
+            expect(await ethers.provider.getBalance(sovereignAgent.target)).to.equal(bountyAmount1 + bountyAmount2);
+        });
 
-  it("posts a bounty and escrows the amount", async function () {
-    await expect(contract.postBounty("repo#1", ethers.parseEther("2")))
-      .to.emit(contract, "BountyPosted")
-      .withArgs("repo#1", ethers.parseEther("2"));
+        it("should revert if bounty amount (msg.value) is zero", async function () {
+            const description = "Zero value bounty that should fail";
+            // Attempt to post a bounty with 0 ETH, which should revert
+            await expect(sovereignAgent.connect(addr1).postBounty(description, { value: 0 }))
+                .to.be.revertedWith("Bounty amount must be greater than zero");
+        });
+    });
 
-    expect(await contract.bounties("repo#1")).to.equal(ethers.parseEther("2"));
-    expect(await contract.totalEscrowed()).to.equal(ethers.parseEther("2"));
-    // Spendable: 10 - 1 (buffer) - 2 (escrowed) = 7
-    expect(await contract.spendableBalance()).to.equal(ethers.parseEther("7"));
-  });
+    describe("releaseBounty", function () {
+        const bountyAmount = ethers.parseEther("1");
+        const description = "Fix critical bug in backend service";
+        let bountyId; // Variable to store the ID of the bounty posted in beforeEach
 
-  it("rejects duplicate bounty", async function () {
-    await contract.postBounty("repo#1", ethers.parseEther("1"));
-    await expect(
-      contract.postBounty("repo#1", ethers.parseEther("1"))
-    ).to.be.revertedWith("SovereignAgent: bounty already posted");
-  });
+        // This beforeEach hook runs before each test in the 'releaseBounty' suite
+        beforeEach(async function () {
+            // Post a bounty using addr1. This ensures a bounty exists for testing release functionality.
+            await sovereignAgent.connect(addr1).postBounty(description, { value: bountyAmount });
+            bountyId = 0; // The first bounty posted will consistently have ID 0 based on `nextBountyId++`
+        });
 
-  it("rejects bounty exceeding spendable balance", async function () {
-    // 9 XTZ spendable
-    await expect(
-      contract.postBounty("repo#1", ethers.parseEther("10"))
-    ).to.be.revertedWith("SovereignAgent: insufficient spendable balance");
-  });
+        it("should allow the owner to release a bounty to a recipient and emit a BountyReleased event", async function () {
+            const initialRecipientBalance = await ethers.provider.getBalance(addr2.address);
+            const initialContractBalance = await ethers.provider.getBalance(sovereignAgent.target);
 
-  it("rejects bounty from non-agent", async function () {
-    await expect(
-      contract.connect(other).postBounty("repo#1", ethers.parseEther("1"))
-    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
-  });
+            // Owner releases the bounty to addr2
+            // Expect an event 'BountyReleased' to be emitted with correct arguments
+            await expect(sovereignAgent.connect(owner).releaseBounty(bountyId, addr2.address))
+                .to.emit(sovereignAgent, "BountyReleased")
+                .withArgs(bountyId, addr2.address, bountyAmount);
 
-  // ── Bounty release ─────────────────────────────────────────────────────────
+            // Verify the recipient's balance increased by the bounty amount
+            const finalRecipientBalance = await ethers.provider.getBalance(addr2.address);
+            expect(finalRecipientBalance).to.equal(initialRecipientBalance + bountyAmount);
 
-  it("releases bounty and pays contributor", async function () {
-    await contract.postBounty("repo#1", ethers.parseEther("2"));
+            // Verify the contract's balance decreased by the bounty amount
+            const finalContractBalance = await ethers.provider.getBalance(sovereignAgent.target);
+            expect(finalContractBalance).to.equal(initialContractBalance - bountyAmount);
 
-    const balBefore = await ethers.provider.getBalance(contributor.address);
+            // Verify the bounty's status is updated to 'released'
+            const bounty = await sovereignAgent.bounties(bountyId);
+            expect(bounty.released).to.be.true;
+        });
 
-    await expect(contract.releaseBounty("repo#1", contributor.address))
-      .to.emit(contract, "BountyReleased")
-      .withArgs("repo#1", contributor.address, ethers.parseEther("2"));
+        it("should revert if an unauthorized caller tries to release a bounty", async function () {
+            // addr1 (who is not the owner) tries to release the bounty
+            // Expect a custom error from Ownable contract
+            await expect(sovereignAgent.connect(addr1).releaseBounty(bountyId, addr2.address))
+                .to.be.revertedWithCustomError(sovereignAgent, "OwnableUnauthorizedAccount")
+                .withArgs(addr1.address); // The error should include the unauthorized address
+        });
 
-    const balAfter = await ethers.provider.getBalance(contributor.address);
-    expect(balAfter - balBefore).to.equal(ethers.parseEther("2"));
+        it("should revert if trying to release a non-existent bounty", async function () {
+            const nonExistentBountyId = 999; // An ID that has not been posted
+            // Owner tries to release a bounty with an invalid ID
+            await expect(sovereignAgent.connect(owner).releaseBounty(nonExistentBountyId, addr2.address))
+                .to.be.revertedWith("Bounty does not exist");
+        });
 
-    // State cleanup
-    expect(await contract.bountyPaid("repo#1")).to.be.true;
-    expect(await contract.bounties("repo#1")).to.equal(0);
-    expect(await contract.totalEscrowed()).to.equal(0);
-    expect(await contract.bountyClaimant("repo#1")).to.equal(contributor.address);
-  });
+        it("should revert if trying to release an already released bounty", async function () {
+            // First, release the bounty successfully
+            await sovereignAgent.connect(owner).releaseBounty(bountyId, addr2.address);
 
-  it("rejects double release", async function () {
-    await contract.postBounty("repo#1", ethers.parseEther("1"));
-    await contract.releaseBounty("repo#1", contributor.address);
+            // Then, try to release the same bounty again
+            await expect(sovereignAgent.connect(owner).releaseBounty(bountyId, addr2.address))
+                .to.be.revertedWith("Bounty already released");
+        });
+    });
 
-    await expect(
-      contract.releaseBounty("repo#1", contributor.address)
-    ).to.be.revertedWith("SovereignAgent: bounty already paid");
-  });
+    describe("investSurplus", function () {
+        const surplusAmount = ethers.parseEther("0.5"); // Amount to invest
 
-  it("rejects release of non-existent bounty", async function () {
-    await expect(
-      contract.releaseBounty("repo#999", contributor.address)
-    ).to.be.revertedWith("SovereignAgent: no bounty posted");
-  });
+        // This beforeEach hook runs before each test in the 'investSurplus' suite
+        beforeEach(async function () {
+            // Send some surplus ETH directly to the contract.
+            // This simulates funds accumulating in the contract beyond active bounties,
+            // which can then be invested. We use 'owner.sendTransaction' to send ETH
+            // directly to the contract's 'receive' or 'fallback' function.
+            await owner.sendTransaction({
+                to: sovereignAgent.target,
+                value: ethers.parseEther("1"), // Contract will have 1 ETH surplus initially for these tests
+            });
+        });
 
-  // ── investSurplus ──────────────────────────────────────────────────────────
+        it("should allow the owner to invest surplus funds to an investment wallet and emit a SurplusInvested event", async function () {
+            const initialInvestmentWalletBalance = await ethers.provider.getBalance(investmentWallet.address);
+            const initialContractBalance = await ethers.provider.getBalance(sovereignAgent.target);
 
-  it("invests surplus to target", async function () {
-    const target = other;
-    const balBefore = await ethers.provider.getBalance(target.address);
+            // Owner invests surplus funds to the 'investmentWallet'
+            // Expect an event 'SurplusInvested' to be emitted with correct arguments
+            await expect(sovereignAgent.connect(owner).investSurplus(investmentWallet.address, surplusAmount))
+                .to.emit(sovereignAgent, "SurplusInvested")
+                .withArgs(investmentWallet.address, surplusAmount);
 
-    // Spendable = 9 XTZ (no bounties escrowed)
-    await expect(contract.investSurplus(target.address))
-      .to.emit(contract, "SurplusInvested");
+            // Verify the investment wallet's balance increased by the invested amount
+            const finalInvestmentWalletBalance = await ethers.provider.getBalance(investmentWallet.address);
+            expect(finalInvestmentWalletBalance).to.equal(initialInvestmentWalletBalance + surplusAmount);
 
-    const balAfter = await ethers.provider.getBalance(target.address);
-    expect(balAfter - balBefore).to.equal(ethers.parseEther("9"));
+            // Verify the contract's balance decreased by the invested amount
+            const finalContractBalance = await ethers.provider.getBalance(sovereignAgent.target);
+            expect(finalContractBalance).to.equal(initialContractBalance - surplusAmount);
+        });
 
-    // After investing, only buffer remains
-    expect(await contract.treasuryBalance()).to.equal(BUFFER);
-    expect(await contract.spendableBalance()).to.equal(0);
-  });
+        it("should revert if an unauthorized caller tries to invest surplus", async function () {
+            // addr1 (who is not the owner) tries to invest surplus
+            // Expect a custom error from Ownable contract
+            await expect(sovereignAgent.connect(addr1).investSurplus(investmentWallet.address, surplusAmount))
+                .to.be.revertedWithCustomError(sovereignAgent, "OwnableUnauthorizedAccount")
+                .withArgs(addr1.address);
+        });
 
-  it("investSurplus respects escrowed bounties", async function () {
-    await contract.postBounty("repo#1", ethers.parseEther("5"));
-    // Spendable = 10 - 1 (buffer) - 5 (escrowed) = 4
-    const target = other;
-    const balBefore = await ethers.provider.getBalance(target.address);
+        it("should revert if investment amount is zero", async function () {
+            // Owner tries to invest 0 ETH
+            await expect(sovereignAgent.connect(owner).investSurplus(investmentWallet.address, 0))
+                .to.be.revertedWith("Investment amount must be greater than zero");
+        });
 
-    await contract.investSurplus(target.address);
-
-    const balAfter = await ethers.provider.getBalance(target.address);
-    expect(balAfter - balBefore).to.equal(ethers.parseEther("4"));
-
-    // Contract retains buffer + escrowed = 6 XTZ
-    expect(await contract.treasuryBalance()).to.equal(ethers.parseEther("6"));
-    // Bounty is still releasable
-    await contract.releaseBounty("repo#1", contributor.address);
-  });
-
-  it("rejects investSurplus when no surplus", async function () {
-    // Escrow almost everything
-    await contract.postBounty("repo#1", ethers.parseEther("9"));
-    // Spendable = 10 - 1 - 9 = 0
-    await expect(
-      contract.investSurplus(other.address)
-    ).to.be.revertedWith("SovereignAgent: no surplus to invest");
-  });
-
-  // ── Agent rotation ─────────────────────────────────────────────────────────
-
-  it("setAgent transfers agent role", async function () {
-    await contract.setAgent(other.address);
-    expect(await contract.agent()).to.equal(other.address);
-    // Old agent can no longer operate
-    await expect(
-      contract.postBounty("repo#1", ethers.parseEther("1"))
-    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
-  });
+        it("should revert if contract has insufficient balance for the requested investment", async function () {
+            const largerAmount = ethers.parseEther("2"); // Contract only has 1 ETH from beforeEach
+            // Owner tries to invest an amount greater than the contract's current balance
+            await expect(sovereignAgent.connect(owner).investSurplus(investmentWallet.address, largerAmount))
+                .to.be.revertedWith("Insufficient contract balance for investment");
+        });
+    });
 });
