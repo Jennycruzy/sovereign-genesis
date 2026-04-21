@@ -59,14 +59,14 @@ export default function OpenBounties() {
         </div>
 
         {/* How to submit */}
-        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 mb-6">
+        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-3 sm:p-4 mb-6">
           <h3 className="text-sm font-bold text-slate-300 mb-2">How to Contribute</h3>
           <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
             <li>Fork the repository and complete the bounty task</li>
             <li>Open a Pull Request against the main branch</li>
-            <li>
+            <li className="flex flex-wrap items-center gap-1">
               Include your payout wallet in the PR description:
-              <code className="ml-1 bg-slate-800 text-tezos-400 px-1.5 py-0.5 rounded text-xs">
+              <code className="bg-slate-800 text-tezos-400 px-1.5 py-0.5 rounded text-xs whitespace-nowrap">
                 Wallet: 0xYourAddress
               </code>
             </li>
@@ -96,9 +96,9 @@ function BountyCard({ bounty }) {
   const s = STATUS_STYLE[bounty.status] || STATUS_STYLE.open;
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
+    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-4 sm:p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
       {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start justify-between gap-2 sm:gap-3">
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-bold text-slate-200 leading-snug">
             {bounty.title}
@@ -107,7 +107,7 @@ function BountyCard({ bounty }) {
         </div>
         <span className={`shrink-0 flex items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}>
           <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-          {s.badge}
+          <span className="hidden xs:inline">{s.badge}</span>
         </span>
       </div>
 
@@ -146,16 +146,16 @@ function BountyCard({ bounty }) {
       {/* Paid to (if completed) */}
       {bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000" && (
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-600 uppercase tracking-wider">Paid to:</span>
-            <span className="text-xs font-mono text-emerald-400 truncate">{bounty.paidTo}</span>
+            <span className="text-xs font-mono text-emerald-400 truncate max-w-[200px]">{bounty.paidTo}</span>
           </div>
           {bounty.txHash && (
             <a
               href={`https://shadownet.explorer.etherlink.com/tx/${bounty.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate ml-[calc(theme(spacing.2)+3.5rem)] -mt-0.5"
+              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate"
             >
               verify tx →
             </a>
@@ -163,13 +163,13 @@ function BountyCard({ bounty }) {
         </div>
       )}
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
+      {/* Actions — stack on mobile */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
         <a
           href={bounty.repoUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-1 text-center text-xs px-3 py-2 rounded-lg border border-sovereign-700 bg-sovereign-900/30 text-sovereign-300 hover:bg-sovereign-800/40 transition-colors"
+          className="flex-1 text-center text-xs px-3 py-2 rounded-lg border border-sovereign-700 bg-sovereign-900/30 text-sovereign-300 hover:bg-sovereign-800/40 transition-colors whitespace-nowrap"
         >
           {bounty.status === "completed"
             ? "View Repo"
@@ -181,7 +181,7 @@ function BountyCard({ bounty }) {
           href={bounty.issueUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-xs px-3 py-2 rounded-lg border border-slate-700 bg-slate-900/30 text-slate-400 hover:text-slate-300 transition-colors"
+          className="text-center text-xs px-3 py-2 rounded-lg border border-slate-700 bg-slate-900/30 text-slate-400 hover:text-slate-300 transition-colors whitespace-nowrap"
         >
           Issue →
         </a>

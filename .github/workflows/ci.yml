@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Contract tests (Hardhat / Solidity) ────────────────────────────────────
+  contracts:
+    name: Contracts (Hardhat)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Compile Solidity contracts
+        run: npm run compile
+        env:
+          ETHERLINK_RPC: ${{ secrets.ETHERLINK_RPC }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+
+      - name: Run contract tests
+        run: npm test
+        env:
+          ETHERLINK_RPC: ${{ secrets.ETHERLINK_RPC }}
+          DEPLOYER_PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+
+  # ── Agent & scripts lint / syntax check ───────────────────────────────────
+  agent-scripts:
+    name: Agent & Scripts (Lint + Syntax)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax-check agent scripts
+        run: |
+          node --check agent/index.js
+          node --check agent/contract.js
+          node --check agent/executor.js
+          node --check agent/financial.js
+          node --check agent/judge.js
+          node --check agent/logger.js
+          node --check agent/scanner.js
+
+      - name: Syntax-check scripts
+        run: |
+          node --check scripts/deploy.js
+
+      - name: Syntax-check webhook
+        run: |
+          node --check webhook/server.js
+
+      - name: Lint with standard (optional)
+        run: npx standard agent/ scripts/ webhook/ --ignore node_modules 2>&1 || true
