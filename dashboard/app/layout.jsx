@@ -20,7 +20,7 @@ export default function RootLayout({ children }) {
         {/* Top accent line */}
         <div className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-sovereign-500 to-transparent z-50" />
 
-        <div className="relative z-10">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
           {children}
         </div>
       </body>
