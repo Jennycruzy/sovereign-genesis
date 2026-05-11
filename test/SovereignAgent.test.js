@@ -216,4 +216,6 @@ describe("SovereignAgent", function () {
       contract.postBounty("repo#1", ethers.parseEther("1"))
     ).to.be.revertedWith("SovereignAgent: caller is not the agent");
   });
+
+  // trigger-sync-minimal
 });
