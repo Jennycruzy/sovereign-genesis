@@ -41,7 +41,7 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <Header lastUpdated={lastPoll} />
 
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 space-y-6">
@@ -81,7 +81,7 @@ export default function DashboardPage() {
         <StatsStrip data={data} />
       </main>
 
-      <footer className="border-t border-slate-900 px-6 py-3 text-center text-xs text-slate-700">
+      <footer className="border-t border-slate-900 px-4 sm:px-6 py-3 text-center text-xs text-slate-700">
         SOVEREIGN-GENESIS · Autonomous AI · Tezos Etherlink EVM · Poll every {POLL_INTERVAL / 1000}s
       </footer>
     </div>
