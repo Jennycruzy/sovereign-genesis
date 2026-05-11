@@ -218,4 +218,5 @@ describe("SovereignAgent", function () {
   });
 
   // trigger-sync-minimal
+  // trigger-sync-wallet-refresh-minimal
 });
