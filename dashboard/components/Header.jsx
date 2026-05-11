@@ -66,11 +66,11 @@ export default function Header({ lastUpdated }) {
         </div>
 
         {/* Status bar + Theme Toggle */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex flex-wrap items-start sm:items-center gap-2 text-xs w-full sm:w-auto">
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300 ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all duration-300 shrink-0 ${
               isDark
                 ? 'border-sovereign-700/50 bg-sovereign-900/30 text-slate-300 hover:bg-sovereign-800/50'
                 : 'border-sovereign-300 bg-sovereign-50 text-light-text hover:bg-sovereign-100'
@@ -83,14 +83,14 @@ export default function Header({ lastUpdated }) {
             </span>
           </button>
 
-          <div className={`flex items-center gap-1.5 ${
+          <div className={`flex items-center gap-1.5 whitespace-nowrap ${
             isDark ? 'text-slate-500' : 'text-light-muted'
           }`}>
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>Live</span>
           </div>
           <div className={`h-3 w-px ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
-          <span className={isDark ? 'text-slate-500' : 'text-light-muted'}>
+          <span className={`${isDark ? 'text-slate-500' : 'text-light-muted'} whitespace-nowrap`}>
             Updated: <span className={isDark ? 'text-slate-400' : 'text-light-text'}>{time}</span>
           </span>
           <div className={`h-3 w-px ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
