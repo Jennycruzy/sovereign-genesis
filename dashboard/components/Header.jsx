@@ -30,14 +30,14 @@ export default function Header({ lastUpdated }) {
   };
 
   return (
-    <header className={`relative border-b backdrop-blur-sm px-6 py-4 transition-colors duration-300 ${
+    <header className={`relative border-b backdrop-blur-sm px-4 py-4 sm:px-6 transition-colors duration-300 ${
       isDark 
         ? 'border-sovereign-900/60 bg-[#050509]/90' 
         : 'border-light-border bg-light-card'
     }`}>
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {/* Logo / title */}
-        <div className="flex items-center gap-4">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <div className="relative">
             <div className={`h-10 w-10 rounded-lg flex items-center justify-center text-lg font-bold shadow-lg transition-colors duration-300 ${
               isDark
@@ -51,22 +51,22 @@ export default function Header({ lastUpdated }) {
                  style={{ borderColor: isDark ? '#050509' : '#ffffff' }} />
           </div>
 
-          <div>
-            <h1 className="text-xl font-bold tracking-widest uppercase">
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold tracking-widest uppercase sm:text-xl mobile-safe-text">
               <span className="text-neon-purple">Sovereign</span>
               <span className={isDark ? 'text-slate-500' : 'text-light-muted'}>-</span>
               <span className="text-neon-blue">Genesis</span>
             </h1>
             <p className={`text-xs tracking-widest ${
               isDark ? 'text-slate-600' : 'text-light-muted'
-            }`}>
+            } mobile-safe-text`}>
               AUTONOMOUS AI TREASURY · TEZOS ETHERLINK
             </p>
           </div>
         </div>
 
         {/* Status bar + Theme Toggle */}
-        <div className="flex items-center gap-4 text-xs">
+        <div className="flex w-full flex-wrap items-center gap-3 text-xs sm:w-auto sm:justify-end sm:gap-4">
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
@@ -89,11 +89,11 @@ export default function Header({ lastUpdated }) {
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>Live</span>
           </div>
-          <div className={`h-3 w-px ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
+          <div className={`hidden h-3 w-px sm:block ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
           <span className={isDark ? 'text-slate-500' : 'text-light-muted'}>
             Updated: <span className={isDark ? 'text-slate-400' : 'text-light-text'}>{time}</span>
           </span>
-          <div className={`h-3 w-px ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
+          <div className={`hidden h-3 w-px sm:block ${isDark ? 'bg-slate-700' : 'bg-light-border'}`} />
           <span className="text-sovereign-500">EVM · Chain 127823</span>
         </div>
       </div>

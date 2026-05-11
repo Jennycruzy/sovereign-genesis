@@ -1,43 +1,30 @@
- /* ── Mobile responsiveness
-
-  ───────────────────────────────────────────────── */                
-
-                 
-
-  @media (max-width: 640px) {                                          
-
-    body {
-
-      font-size: 13px;                                                
-
-    }            
-
-
-
-    .card-glow,                                                        
-
-    .card-glow-blue {
-
-      box-shadow: none;                                                
-
-      border: 1px solid rgba(139, 92, 246, 0.25);                      
-
-    }
-
-                                                                       
-
-    .scanline::after {
-
-      display: none;
-
-    }
-
-                                                                       
-
-    ::-webkit-scrollbar {
-
-      width: 0px;                                                      
-
-    }            
-
+@media (max-width: 640px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
   }
+
+  body {
+    font-size: 13px;
+  }
+
+  .card-glow,
+  .card-glow-blue {
+    box-shadow: none;
+    border: 1px solid rgba(139, 92, 246, 0.25);
+  }
+
+  .scanline::after {
+    display: none;
+  }
+
+  .mobile-safe-text {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  ::-webkit-scrollbar {
+    width: 0;
+  }
+}
