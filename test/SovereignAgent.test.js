@@ -77,6 +77,21 @@ describe("SovereignAgent", function () {
     ).to.be.revertedWith("SovereignAgent: insufficient spendable balance");
   });
 
+  it("rejects zero bounty amount", async function () {
+    await expect(
+      contract.postBounty("repo#1", 0)
+    ).to.be.revertedWith("SovereignAgent: zero bounty amount");
+  });
+
+  it("release blocks if reserve becomes underfunded after buffer increase", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("2"));
+    await contract.setLifeSupportBuffer(ethers.parseEther("10"));
+
+    await expect(
+      contract.releaseBounty("repo#1", contributor.address)
+    ).to.be.revertedWith("SovereignAgent: would breach life-support buffer");
+  });
+
   it("rejects bounty from non-agent", async function () {
     await expect(
       contract.connect(other).postBounty("repo#1", ethers.parseEther("1"))
@@ -117,6 +132,22 @@ describe("SovereignAgent", function () {
     await expect(
       contract.releaseBounty("repo#999", contributor.address)
     ).to.be.revertedWith("SovereignAgent: no bounty posted");
+  });
+
+  it("rejects release to zero address", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+
+    await expect(
+      contract.releaseBounty("repo#1", ethers.ZeroAddress)
+    ).to.be.revertedWith("SovereignAgent: zero contributor address");
+  });
+
+  it("rejects release from non-agent", async function () {
+    await contract.postBounty("repo#1", ethers.parseEther("1"));
+
+    await expect(
+      contract.connect(other).releaseBounty("repo#1", contributor.address)
+    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
   });
 
   // ── investSurplus ──────────────────────────────────────────────────────────
@@ -163,6 +194,18 @@ describe("SovereignAgent", function () {
     ).to.be.revertedWith("SovereignAgent: no surplus to invest");
   });
 
+  it("rejects investSurplus to zero target", async function () {
+    await expect(
+      contract.investSurplus(ethers.ZeroAddress)
+    ).to.be.revertedWith("SovereignAgent: zero target address");
+  });
+
+  it("rejects investSurplus from non-agent", async function () {
+    await expect(
+      contract.connect(other).investSurplus(other.address)
+    ).to.be.revertedWith("SovereignAgent: caller is not the agent");
+  });
+
   // ── Agent rotation ─────────────────────────────────────────────────────────
 
   it("setAgent transfers agent role", async function () {
@@ -173,4 +216,7 @@ describe("SovereignAgent", function () {
       contract.postBounty("repo#1", ethers.parseEther("1"))
     ).to.be.revertedWith("SovereignAgent: caller is not the agent");
   });
+
+  // trigger-sync-minimal
+  // trigger-sync-wallet-refresh-minimal
 });
