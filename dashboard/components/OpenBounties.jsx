@@ -35,9 +35,9 @@ export default function OpenBounties() {
   return (
     <div className="space-y-6">
       {/* Section header */}
-      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur">
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-3">
+      <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 backdrop-blur sm:p-6">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
               Open Bounties
             </h2>
@@ -59,14 +59,14 @@ export default function OpenBounties() {
         </div>
 
         {/* How to submit */}
-        <div className="rounded-lg border border-slate-700/50 bg-slate-900/50 p-4 mb-6">
+        <div className="mb-6 rounded-lg border border-slate-700/50 bg-slate-900/50 p-4">
           <h3 className="text-sm font-bold text-slate-300 mb-2">How to Contribute</h3>
           <ol className="text-xs text-slate-400 space-y-1.5 list-decimal list-inside">
             <li>Fork the repository and complete the bounty task</li>
             <li>Open a Pull Request against the main branch</li>
             <li>
               Include your payout wallet in the PR description:
-              <code className="ml-1 bg-slate-800 text-tezos-400 px-1.5 py-0.5 rounded text-xs">
+              <code className="mt-1 inline-block max-w-full rounded bg-slate-800 px-1.5 py-0.5 text-xs text-tezos-400 mobile-safe-text sm:mt-0 sm:ml-1">
                 Wallet: 0xYourAddress
               </code>
             </li>
@@ -96,23 +96,23 @@ function BountyCard({ bounty }) {
   const s = STATUS_STYLE[bounty.status] || STATUS_STYLE.open;
 
   return (
-    <div className="rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-5 flex flex-col gap-3 hover:border-sovereign-700/50 transition-colors">
+    <div className="flex flex-col gap-3 rounded-lg border border-slate-700/50 bg-[#0d0d1a]/80 p-4 transition-colors hover:border-sovereign-700/50 sm:p-5">
       {/* Header row */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-bold text-slate-200 leading-snug">
+          <h3 className="text-sm font-bold leading-snug text-slate-200 mobile-safe-text">
             {bounty.title}
           </h3>
           <span className="text-xs text-slate-600 mt-0.5">#{bounty.id}</span>
         </div>
-        <span className={`shrink-0 flex items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}>
+        <span className={`flex w-fit shrink-0 items-center gap-1.5 text-xs ${s.color} ${s.bg} border px-2 py-0.5 rounded`}>
           <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
           {s.badge}
         </span>
       </div>
 
       {/* Description */}
-      <p className="text-xs text-slate-400 leading-relaxed line-clamp-3">
+      <p className="text-xs leading-relaxed text-slate-400 line-clamp-3 mobile-safe-text">
         {bounty.description}
       </p>
 
@@ -148,14 +148,14 @@ function BountyCard({ bounty }) {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-600 uppercase tracking-wider">Paid to:</span>
-            <span className="text-xs font-mono text-emerald-400 truncate">{bounty.paidTo}</span>
+            <span className="text-xs font-mono text-emerald-400 mobile-safe-text">{bounty.paidTo}</span>
           </div>
           {bounty.txHash && (
             <a
               href={`https://shadownet.explorer.etherlink.com/tx/${bounty.txHash}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-mono text-slate-500 hover:text-sovereign-400 transition-colors truncate ml-[calc(theme(spacing.2)+3.5rem)] -mt-0.5"
+              className="text-xs font-mono text-slate-500 transition-colors hover:text-sovereign-400 mobile-safe-text sm:ml-[calc(theme(spacing.2)+3.5rem)] sm:-mt-0.5"
             >
               verify tx →
             </a>
@@ -164,7 +164,7 @@ function BountyCard({ bounty }) {
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-800/50">
+      <div className="mt-auto flex flex-col gap-2 border-t border-slate-800/50 pt-2 sm:flex-row sm:items-center">
         <a
           href={bounty.repoUrl}
           target="_blank"

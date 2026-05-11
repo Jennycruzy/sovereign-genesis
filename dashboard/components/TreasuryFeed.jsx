@@ -14,9 +14,9 @@ const EVENT_META = {
 
 export default function TreasuryFeed({ events = [], isLoading }) {
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur h-full">
+    <div className="card-glow h-full rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 backdrop-blur sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
           Treasury Activity
         </h2>
@@ -50,8 +50,8 @@ function EventRow({ event }) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between gap-2">
-          <span className={`text-sm font-bold ${meta.color}`}>{meta.label}</span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className={`text-sm font-bold ${meta.color} mobile-safe-text`}>{meta.label}</span>
           {event.blockNumber && (
             <span className="text-xs text-slate-600">#{event.blockNumber}</span>
           )}
@@ -62,7 +62,7 @@ function EventRow({ event }) {
           {Object.entries(args).map(([k, v]) => (
             <div key={k} className="flex gap-2">
               <span className="text-slate-600 shrink-0">{k}:</span>
-              <span className="truncate font-mono">
+              <span className="font-mono mobile-safe-text">
                 {typeof v === "object" && v !== null ? (v.hash || JSON.stringify(v)) : String(v)}
               </span>
             </div>
@@ -75,7 +75,7 @@ function EventRow({ event }) {
             href={`https://shadownet.explorer.etherlink.com/tx/${event.txHash}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-1 block text-xs text-sovereign-600 hover:text-sovereign-400 font-mono truncate transition-colors"
+            className="mt-1 block text-xs font-mono text-sovereign-600 transition-colors hover:text-sovereign-400 mobile-safe-text"
           >
             tx: {event.txHash}
           </a>

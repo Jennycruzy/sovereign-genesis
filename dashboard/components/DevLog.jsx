@@ -29,10 +29,10 @@ export default function DevLog() {
   );
 
   return (
-    <div className="card-glow rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-6 backdrop-blur h-full">
+    <div className="card-glow h-full rounded-xl border border-sovereign-800/50 bg-[#0a0a14]/80 p-4 backdrop-blur sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-lg font-bold tracking-widest uppercase text-sovereign-300">
             Development Log
           </h2>
@@ -49,7 +49,13 @@ export default function DevLog() {
           No bounties yet.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <>
+        <div className="space-y-3 sm:hidden">
+          {sorted.map((b) => (
+            <BountyMobileCard key={b.id} bounty={b} />
+          ))}
+        </div>
+        <div className="hidden sm:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-600 uppercase tracking-widest border-b border-slate-800">
@@ -66,8 +72,105 @@ export default function DevLog() {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
+  );
+}
+
+function BountyMobileCard({ bounty }) {
+  const paid = bounty.status === "completed";
+  const hasPaidTo = bounty.paidTo && bounty.paidTo !== "0x0000000000000000000000000000000000000000";
+
+  return (
+    <div className="rounded-lg border border-slate-800/80 bg-slate-950/40 p-3">
+      <a
+        href={bounty.issueUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs font-semibold text-sovereign-400 transition-colors hover:text-sovereign-300 mobile-safe-text"
+      >
+        {bounty.title}
+      </a>
+      <div className="mt-1 text-xs font-mono text-slate-600">#{bounty.id}</div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <div className="mb-1 text-slate-600 uppercase tracking-wider">Reward</div>
+          <span className="font-mono font-bold text-neon-blue">{bounty.reward}</span>
+          {bounty.volatilityNote && (
+            <span className="mt-1 block text-amber-500" title={bounty.volatilityNote}>
+              adjusted
+            </span>
+          )}
+        </div>
+        <div>
+          <div className="mb-1 text-slate-600 uppercase tracking-wider">Status</div>
+          <StatusBadge status={bounty.status} note={bounty.noPayoutNote} />
+        </div>
+      </div>
+
+      <div className="mt-3 text-xs">
+        <div className="mb-1 text-slate-600 uppercase tracking-wider">Contributor</div>
+        {hasPaidTo ? (
+          <div className="font-mono text-emerald-400 mobile-safe-text">{bounty.paidTo}</div>
+        ) : (
+          <span className="text-slate-600">open</span>
+        )}
+        {hasPaidTo && bounty.txHash && (
+          <a
+            href={`${EXPLORER}/tx/${bounty.txHash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 block font-mono text-slate-600 transition-colors hover:text-sovereign-400 mobile-safe-text"
+          >
+            verify tx →
+          </a>
+        )}
+      </div>
+
+      {paid && !hasPaidTo && (
+        <div className="mt-3 rounded-md border border-emerald-700/40 bg-emerald-900/20 px-2 py-1 text-xs text-emerald-400">
+          Paid
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ status, note }) {
+  if (status === "completed") {
+    return (
+      <span className="flex w-fit items-center gap-1 rounded border border-emerald-700/40 bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+        PAID
+      </span>
+    );
+  }
+  if (status === "funded") {
+    return (
+      <span className="flex w-fit items-center gap-1 rounded border border-tezos-700/40 bg-tezos-900/30 px-2 py-0.5 text-xs text-tezos-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-tezos-400 animate-pulse" />
+        FUNDED
+      </span>
+    );
+  }
+  if (status === "no_payout") {
+    return (
+      <span
+        className="flex w-fit items-center gap-1 rounded border border-slate-700/40 bg-slate-900/30 px-2 py-0.5 text-xs text-slate-400"
+        title={note || "Issue resolved without payout"}
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+        NO PAYOUT
+      </span>
+    );
+  }
+  return (
+    <span className="flex w-fit items-center gap-1 rounded border border-amber-700/40 bg-amber-900/30 px-2 py-0.5 text-xs text-amber-400">
+      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+      OPEN
+    </span>
   );
 }
 

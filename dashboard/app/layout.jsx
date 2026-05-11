@@ -1,4 +1,5 @@
 import "./globals.css";
+import "./mobile.css";
 
 export const metadata = {
   title:       "SOVEREIGN-GENESIS | Autonomous AI Treasury",
